@@ -12,4 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+# Sample configuration for a multi-cloud deployment across EKS and GKE clusters.
+
+deployment:
+  multiCluster: true
+
+locations:
+  # EKS cluster in us-east-1
+  - name: us-east-1
+    namespace: spanner-ns-use1
+    zones:
+      - name: "us-east-1c"
+        shortName: "a"
+  # GKE cluster in us-central1
+  - name: us-central1
+    namespace: spanner-ns-usc1
+    zones:
+      - name: "us-central1-a"
+        shortName: "a"

@@ -12,4 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+apiVersion: 1
+
+providers:
+  - name: dashboards
+    type: file
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards

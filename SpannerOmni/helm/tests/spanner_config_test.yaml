@@ -1,0 +1,62 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Spanner Config Tests
+templates:
+  - spanner-config.yaml
+
+tests:
+  - it: should render default example comments when spannerConfig is empty
+    asserts:
+      - matchRegex:
+          path: data["spanner.cfg"]
+          pattern: "# Spanner Configuration"
+        template: spanner-config.yaml
+
+  - it: should render custom configuration when spannerConfig is provided
+    set:
+      deployment:
+        spannerConfig: |
+          my_custom_key=my_custom_value
+          another_key=another_value
+    asserts:
+      - matchRegex:
+          path: data["spanner.cfg"]
+          pattern: "my_custom_key=my_custom_value"
+        template: spanner-config.yaml
+      - matchRegex:
+          path: data["spanner.cfg"]
+          pattern: "another_key=another_value"
+        template: spanner-config.yaml
+
+  - it: should configure root_servers_serve_user_data flags via deployment.spannerConfig
+    set:
+      deployment:
+        spannerConfig: |
+          spanner_omni_root_servers_serve_user_data=false
+          base_services.spanner_omni_root_servers_serve_user_data=false
+          zone_server.spanner_omni_root_servers_serve_user_data=false
+    asserts:
+      - matchRegex:
+          path: data["spanner.cfg"]
+          pattern: "spanner_omni_root_servers_serve_user_data=false"
+        template: spanner-config.yaml
+      - matchRegex:
+          path: data["spanner.cfg"]
+          pattern: "base_services.spanner_omni_root_servers_serve_user_data=false"
+        template: spanner-config.yaml
+      - matchRegex:
+          path: data["spanner.cfg"]
+          pattern: "zone_server.spanner_omni_root_servers_serve_user_data=false"
+        template: spanner-config.yaml

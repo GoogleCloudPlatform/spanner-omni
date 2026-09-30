@@ -1,0 +1,1270 @@
+{
+  "$comment": "Copyright 2026 Google LLC. Licensed under the Apache License, Version 2.0 (the \"License\"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.",
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "expr": "max_over_time(spanner_omni_event_active[$__interval]) == 1",
+        "iconColor": "red",
+        "name": "Event Annotations",
+        "titleFormat": "Event: {{ name }} Action: {{ action }}"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 4,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 14,
+      "options": {
+        "alertInstanceLabelFilter": "",
+        "alertName": "",
+        "dashboardAlerts": false,
+        "groupBy": [],
+        "groupMode": "default",
+        "maxItems": 20,
+        "sortOrder": 1,
+        "stateFilter": {
+          "error": true,
+          "firing": true,
+          "noData": false,
+          "normal": false,
+          "pending": true
+        },
+        "viewMode": "list"
+      },
+      "pluginVersion": "11.4.0",
+      "title": "Active Alerts & System Concerns",
+      "type": "alertlist"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 0,
+        "y": 6
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(spanner_box_vm_cpu_total{job=\"spanner\"})",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Compute Capacity (vCPU)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 5,
+        "y": 6
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(spanner_box_vm_memory_total{job=\"spanner\"})",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Memory Capacity",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "mbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 10,
+        "y": 6
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(filesystem_size{job=\"spanner\", type=\"total\"})",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "Total",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(filesystem_size{job=\"spanner\", type=\"available\"})",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "legendFormat": "Available",
+          "range": true,
+          "refId": "B",
+          "useBackend": false
+        }
+      ],
+      "title": "Storage Capacity",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "dark-red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 18,
+        "y": 6
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "count(group by (spanner_server) (last_over_time(proc_uptime{job=\"spanner\"}[30s]) and on(spanner_server) up{job=\"spanner\"}))",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "interval": "",
+          "legendFormat": "Healthy",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "count(group by (spanner_server) (up{job=\"spanner\"}))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "Total",
+          "range": true,
+          "refId": "B",
+          "useBackend": false
+        }
+      ],
+      "title": "Node Status",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Unhealthy",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Total"
+                }
+              },
+              "operator": "-",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Healthy"
+                }
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Healthy": true,
+              "Time": true
+            },
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.7
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 0,
+        "y": 12
+      },
+      "id": 4,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(rate(proc_cpu_usage{job=\"spanner\"}[$__rate_interval])) / sum(last_over_time(spanner_box_vm_cpu_total{job=\"spanner\"}[20s]))",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "interval": "",
+          "legendFormat": "CPU Utilization",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Compute Utilization",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Total memory usage across the deployment. It is expected to see high memory usage values as spanner tries to aggressively use idle memory for cache purposes.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 5,
+        "y": 12
+      },
+      "id": 5,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(spanner_box_vm_memory_usage{job=\"spanner\"}) / sum(spanner_box_vm_memory_total{job=\"spanner\"})",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Memory Utilization",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "dark-red",
+                "value": 0.8
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 11,
+        "y": 12
+      },
+      "id": 11,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(filesystem_size{job=\"spanner\", type=\"used\"}) / sum(filesystem_size{job=\"spanner\", type=\"total\"})",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Storage Utilization",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "dark-red",
+                "value": 512000
+              }
+            ]
+          },
+          "unit": "mbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 17,
+        "y": 12
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "sum(filesystem_size{job=\"spanner\", type=\"used\"}) / sum(spanner_box_vm_cpu_total{job=\"spanner\"})",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Storage Used Per vCPU",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "min": -1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU Utilization"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "color"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.7
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory utilization"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "color"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.8
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Uptime"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Server"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              },
+              {
+                "id": "custom.minWidth",
+                "value": 300
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Storage Used"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "mbytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Storage Capacity"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "mbytes"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 23,
+        "x": 0,
+        "y": 18
+      },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "sum by(spanner_server, spanner_zone) (rate(proc_cpu_usage{job=\"spanner\"}[$__rate_interval])) / sum by(spanner_server, spanner_zone) (spanner_box_vm_cpu_total{job=\"spanner\"})",
+          "format": "table",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum by(spanner_server, spanner_zone) (spanner_box_vm_memory_usage{job=\"spanner\"}) / sum by(spanner_server, spanner_zone) (spanner_box_vm_memory_total{job=\"spanner\"})",
+          "format": "table",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "B",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "sum by(spanner_server, spanner_zone) (last_over_time(proc_uptime{job=\"spanner\", process=\"server\"}[30s]))",
+          "format": "table",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "C",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "sum by(spanner_server, spanner_zone) (spanner_box_vm_cpu_total{job=\"spanner\"})",
+          "format": "table",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "D",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "sum by(spanner_server, spanner_zone) (spanner_box_vm_memory_total{job=\"spanner\"})",
+          "format": "table",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "E",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "sum by(spanner_server, spanner_zone) (filesystem_size{job=\"spanner\", type=\"used\"})",
+          "format": "table",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "F",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "sum by(spanner_server, spanner_zone) (filesystem_size{job=\"spanner\", type=\"total\"})",
+          "format": "table",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "G",
+          "useBackend": false
+        }
+      ],
+      "title": "Healthy Servers",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value #G": false
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Time": 0,
+              "Value #A": 4,
+              "Value #B": 6,
+              "Value #C": 7,
+              "Value #D": 3,
+              "Value #E": 5,
+              "spanner_server": 1,
+              "spanner_zone": 2
+            },
+            "renameByName": {
+              "Value #A": "CPU Utilization",
+              "Value #B": "Memory utilization",
+              "Value #C": "Uptime",
+              "Value #D": "vCPU",
+              "Value #E": "Memory",
+              "Value #F": "Storage Used",
+              "Value #G": "Storage Capacity",
+              "spanner_server": "Server",
+              "spanner_zone": "Zone"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Server"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Zone"
+              }
+            ]
+          }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "isNull",
+                  "options": {}
+                },
+                "fieldName": "Uptime"
+              }
+            ],
+            "match": "any",
+            "type": "exclude"
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 23,
+        "x": 0,
+        "y": 32
+      },
+      "id": 13,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum by (spanner_server) (up{job=\"spanner\"} unless on(spanner_server) last_over_time(proc_uptime{job=\"spanner\"}[30s]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Unhealthy Servers",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            },
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "spanner_server": " "
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 40,
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Overview",
+  "uid": "spanner_prometheus_overview",
+  "version": 1,
+  "weekStart": ""
+}

@@ -1,0 +1,203 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- if .Values.workers.enabled }}
+{{- $currentLoc := include "spanner-omni.currentLocation" . | fromYaml }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker-pod
+  namespace: {{ include "spanner-omni.namespace" . }}
+  labels:
+    {{- include "spanner-omni.labels" . | nindent 4 }}
+    app.kubernetes.io/component: spanner-worker
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "spanner-omni.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: spanner-worker
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: spanner-worker
+  namespace: {{ include "spanner-omni.namespace" . }}
+  labels:
+    {{- include "spanner-omni.labels" . | nindent 4 }}
+    app.kubernetes.io/component: spanner-worker
+spec:
+  serviceName: worker-pod
+  replicas: {{ .Values.workers.replicas | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "spanner-omni.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: spanner-worker
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "tmp-volume"
+      labels:
+        {{- include "spanner-omni.labels" . | nindent 8 }}
+        app.kubernetes.io/component: spanner-worker
+        location: {{ $currentLoc.name }}
+    spec:
+      automountServiceAccountToken: false
+      
+      affinity:
+        {{- if .Values.workers.affinity }}
+        {{- toYaml .Values.workers.affinity | nindent 8 }}
+        {{- else }}
+        {{- if .Values.workers.nodeLabelKey }}
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: {{ .Values.workers.nodeLabelKey }}
+                operator: In
+                values:
+                - {{ .Values.workers.nodeLabelValue | default "workers" }}
+        {{- end }}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                {{- include "spanner-omni.selectorLabels" . | nindent 16 }}
+                app.kubernetes.io/component: spanner-worker
+            topologyKey: "kubernetes.io/hostname"
+        {{- end }}
+      {{- if .Values.workers.nodeLabelKey }}
+      tolerations:
+      - key: {{ .Values.workers.nodeLabelKey }}
+        operator: "Equal"
+        value: {{ .Values.workers.nodeLabelValue | default "workers" }}
+        effect: "NoSchedule"
+      {{- end }}
+
+      {{- if $.Values.image.pullSecret }}
+      imagePullSecrets:
+      - name: {{ $.Values.image.pullSecret }}
+      {{- end }}
+
+      securityContext:
+        fsGroup: 2000
+        fsGroupChangePolicy: "OnRootMismatch"
+        {{- toYaml $.Values.securityContext.pod | nindent 8 }}
+
+      containers:
+      - name: spanner-worker
+        image: {{ include "spanner-omni.image" $ | quote }}
+        imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        {{- $joinServersList := list }}
+        {{- if .Values.workers.joinServers }}
+          {{- $joinServersList = .Values.workers.joinServers }}
+        {{- else }}
+          {{- $namespace := include "spanner-omni.namespace" . }}
+          {{- $basePort := $.Values.deployment.basePort | default 15000 }}
+          {{- $isDedicated := eq (include "spanner-omni.rootServers.dedicated" .) "true" }}
+          {{- range $zone := $currentLoc.zones }}
+            {{- $shortName := $zone.shortName | default $zone.name }}
+            {{- $prefix := printf "spanner-%s" $shortName }}
+            {{- if and $isDedicated (not $zone.singleServer) }}
+              {{- $prefix = printf "%s-rt" $prefix }}
+            {{- end }}
+            {{- $rootServersCount := int ($zone.rootServers | default $.Values.deployment.rootServersPerZone | default 1) }}
+            {{- range $i := until $rootServersCount }}
+              {{- $joinServersList = append $joinServersList (printf "%s-%d.pod.%s:%v" $prefix $i $namespace $basePort) }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        args:
+        - "workers"
+        - "start"
+        - "--join-servers={{ join "," $joinServersList }}"
+        - "--location={{ $currentLoc.name }}"
+        - "--base-dir=/spanner"
+        - "--address=$(POD_NAME).worker-pod.$(NAMESPACE):{{ .Values.workers.port | default $.Values.deployment.basePort }}"
+        
+        securityContext:
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          privileged: false
+        
+        resources:
+          requests:
+            cpu: "{{ .Values.workers.resources.cpu }}"
+            memory: "{{ .Values.workers.resources.memory }}"
+          limits:
+            cpu: "{{ .Values.workers.resources.cpu }}"
+            memory: "{{ .Values.workers.resources.memory }}"
+        
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        
+        volumeMounts:
+        - name: worker-storage
+          mountPath: /spanner
+        - name: config-volume
+          mountPath: /spanner/conf
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: tls-certs
+          mountPath: /spanner/tls
+          readOnly: true
+        - name: spanner-license-key
+          mountPath: "/spanner/license"
+          readOnly: true
+
+      terminationGracePeriodSeconds: 60
+      
+      volumes:
+      - name: config-volume
+        configMap:
+          name: spanner-config
+          optional: true
+      - name: tmp-volume
+        emptyDir: {}
+      - name: tls-certs
+        secret:
+          secretName: tls-certs
+          optional: true
+          defaultMode: 256
+      - name: spanner-license-key
+        secret:
+          secretName: spanner-license-key
+          optional: true
+          defaultMode: 256
+          items:
+            - key: LICENSE_KEY
+              path: license
+  volumeClaimTemplates:
+  - metadata:
+      name: worker-storage
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: {{ .Values.workers.storage.size | quote }}
+      {{- if .Values.workers.storage.storageClassName }}
+      storageClassName: {{ .Values.workers.storage.storageClassName | quote }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,1251 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: "Spanner Omni Availability"
+    folder: "Spanner Omni"
+    interval: 1m
+    rules:
+      - uid: spanner-pods-unhealthy
+        title: SpannerPodsUnhealthy
+        condition: B
+        for: 5m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "More than 5% of Spanner pods unhealthy"
+          description: "More than 5% of Spanner Omni nodes are failing health checks across the deployment."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                1 - avg(up{job="spanner"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.05
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-truetime-unavail-servers
+        title: TrueTimeUnavailableAcrossServers
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "TrueTime unavailable across multiple servers"
+          description: "TrueTime service is reporting unavailable on more than 1 server across the deployment."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                count(true_time_is_available{job="spanner"} == 0)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-clock-sla-violation
+        title: ClockSlaViolation
+        condition: B
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Clock SLA violation detected"
+          description: "TSC clock SLA violation or non-zero violation rate observed on one or more VMs."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sla_tester_is_violator{job="spanner"} > 0 or rate(sla_tester_violation_count{job="spanner"}[5m]) > 0
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-unassigned-tablets
+        title: UnassignedTablets
+        condition: B
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Unassigned tablets in zone"
+          description: "There are unassigned Spanner tablets in a zone for more than 10 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum by (spanner_zone) (spanner_zonemaster_unassigned_tablets_by_database_and_type{job="spanner"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-booting-tablets-high
+        title: BootingTabletsHigh
+        condition: B
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "High percentage of tablets in booting state"
+          description: "More than 5% of Paxos tablets are in booting state in a zone for over 10 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (sum by (spanner_zone) (spanner_paxos_tablet_count{job="spanner", paxos_state="Booting"}) / sum by (spanner_zone) (spanner_paxos_tablet_count{job="spanner"}))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.05
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+  - orgId: 1
+    name: "Spanner Omni Latency"
+    folder: "Spanner Omni"
+    interval: 1m
+    rules:
+      - uid: spanner-zone-paxos-repl-delay-high
+        title: ZonePaxosReplicationDelayHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Paxos replication delay high in zone"
+          description: "P90 Paxos replication delay for a zone is >3x the median P90 across all zones (with >1s floor)."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                histogram_quantile(0.90, sum by (le, spanner_zone) (rate(spanner_paxos_replication_delay_distribution_bucket{job="spanner"}[5m])))
+                > on() group_left() (
+                  3 * quantile(0.5,
+                    histogram_quantile(0.90, sum by (le, spanner_zone) (rate(spanner_paxos_replication_delay_distribution_bucket{job="spanner"}[5m])))
+                  )
+                )
+                and (
+                  histogram_quantile(0.90, sum by (le, spanner_zone) (rate(spanner_paxos_replication_delay_distribution_bucket{job="spanner"}[5m]))) > 1.0
+                )
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-truetime-high-uncertainty
+        title: TrueTimeHighUncertainityInterval
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "TrueTime high uncertainty interval"
+          description: "TrueTime uncertainty interval P90 exceeds 1s (1,000,000 microseconds)."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                histogram_quantile(0.90, sum by (le) (rate(true_time_interval_uncertainty_bucket{job="spanner"}[5m])))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1000000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-server-read-latency-high
+        title: ServerReadLatencyHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spanner read API latency high"
+          description: "Spanner read API request latency P90 exceeds 50ms for 5 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                histogram_quantile(0.90, sum by (le) (rate(spanner_api_request_latencies_bucket{job="spanner", method=~".*ExecuteSql|.*ExecuteStreamingSql|.*Read|.*StreamingRead"}[1m])))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.05
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-server-write-latency-high
+        title: ServerWriteLatencyHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spanner write API latency high"
+          description: "Spanner write API request latency P90 exceeds 100ms for 5 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                histogram_quantile(0.90, sum by (le) (rate(spanner_api_request_latencies_bucket{job="spanner", method=~".*Commit|.*BatchWrite|.*ExecuteBatchDml"}[1m])))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.1
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-tx-lock-wait-time-high
+        title: TransactionLockWaitTimeHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Transaction lock wait time high"
+          description: "Average transaction lock wait time exceeds 50ms due to key lock contention on span server."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum(rate(spanner_total_lock_wait_time{job="spanner"}[5m])) / sum(rate(spanner_api_request_count{job="spanner"}[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 50000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-spanhostfs-write-lat-high
+        title: SpanHostFsWriteLatencyHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "SpanHostFS write latency high"
+          description: "SpanHostFS storage disk fsync P90 latency exceeds 40ms."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                histogram_quantile(0.90, sum by (le) (rate(filesystem_latency_bucket{job="spanner", operation="Flush"}[5m])))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 40000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-spanhostfs-read-lat-high
+        title: SpanHostFsReadLatencyHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "SpanHostFS read latency high"
+          description: "SpanHostFS storage disk read P90 latency exceeds 20ms."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                histogram_quantile(0.90, sum by (le) (rate(filesystem_latency_bucket{job="spanner", operation=~"PRead|Read"}[5m])))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 20000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+  - orgId: 1
+    name: "Spanner Omni Error Rate & SLA"
+    folder: "Spanner Omni"
+    interval: 1m
+    rules:
+      - uid: spanner-api-error-rate-high
+        title: ApiErrorRateHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spanner API error rate high"
+          description: "User API error rate (all non-OK status codes) exceeds 5%."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (sum(rate(server_canonical_status_count{job="spanner", canonical_code!="OK", command=~".*ExecuteSql|.*ExecuteStreamingSql|.*Read|.*StreamingRead|.*Commit|.*BatchWrite|.*ExecuteBatchDml"}[1m])) or vector(0))
+                /
+                sum(rate(server_completed_rpcs{job="spanner", command=~".*ExecuteSql|.*ExecuteStreamingSql|.*Read|.*StreamingRead|.*Commit|.*BatchWrite|.*ExecuteBatchDml"}[1m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.05
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-transaction-abort-rate
+        title: TransactionAbortRate
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Transaction abort rate high"
+          description: "Transaction abort ratio exceeds 10% over 5 minutes."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum(rate(spanner_transaction_stat_total_commit_attempt_count{job="spanner", status="abort"}[5m]))
+                /
+                sum(rate(spanner_transaction_stat_total_commit_attempt_count{job="spanner"}[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.1
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-spanhostfs-error-rate-high
+        title: SpanHostFsErrorRateHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "SpanHostFS error rate high"
+          description: "SpanHostFS storage disk file operation error rate exceeds 1%."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (sum(rate(filesystem_canonical_status_count{job="spanner", status!="OK"}[5m])) or vector(0))
+                /
+                sum(rate(filesystem_canonical_status_count{job="spanner"}[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.01
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+  - orgId: 1
+    name: "Spanner Omni Resource Usage"
+    folder: "Spanner Omni"
+    interval: 1m
+    rules:
+      - uid: spanner-cpu-util-high
+        title: CPUUtilizationHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Total CPU utilization critical"
+          description: "Total CPU utilization across the Spanner Omni deployment exceeds 90%."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum(rate(proc_cpu_usage{job="spanner"}[5m])) / sum(spanner_box_vm_cpu_total{job="spanner"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.9
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-cpu-util-warning
+        title: CPUUtilizationHighWarning
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Total CPU utilization warning"
+          description: "Total CPU utilization across the Spanner Omni deployment exceeds 70%."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum(rate(proc_cpu_usage{job="spanner"}[5m])) / sum(spanner_box_vm_cpu_total{job="spanner"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.7
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-non-cache-mem-high
+        title: NonCacheMemoryUtilizationHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Non-cache memory utilization critical"
+          description: "Non-cache memory usage exceeds 60% of total memory."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (sum(spanner_box_vm_memory_usage{job="spanner"}) - sum(spanner_server_memory_usage{job="spanner", category="cache"}))
+                /
+                sum(spanner_box_vm_memory_total{job="spanner"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.6
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-non-cache-mem-warning
+        title: NonCacheMemoryUtilizationHighWarning
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Non-cache memory utilization warning"
+          description: "Non-cache memory usage exceeds 50% of total memory."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (sum(spanner_box_vm_memory_usage{job="spanner"}) - sum(spanner_server_memory_usage{job="spanner", category="cache"}))
+                /
+                sum(spanner_box_vm_memory_total{job="spanner"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-data-storage-util-high
+        title: DataStorageUtilizationHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Data storage utilization critical"
+          description: "Used storage volume capacity exceeds 70%."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum by (spanner_server, spanner_zone) (filesystem_size{job="spanner", type="used"}) / sum by (spanner_server, spanner_zone) (filesystem_size{job="spanner", type="total"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.7
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-data-storage-util-warning
+        title: DataStorageUtilizationHighWarning
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Data storage utilization warning"
+          description: "Used storage volume capacity exceeds 60%."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum by (spanner_server, spanner_zone) (filesystem_size{job="spanner", type="used"}) / sum by (spanner_server, spanner_zone) (filesystem_size{job="spanner", type="total"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.6
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-log-storage-util-warning
+        title: LogStorageUtilizationHighWarning
+        condition: B
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Log storage utilization warning"
+          description: "Used log storage volume capacity exceeds 80% on span server."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                sum by (spanner_server, spanner_zone) (log_filesystem_size{job="spanner", type="used"}) / sum by (spanner_server, spanner_zone) (log_filesystem_size{job="spanner", type="total"})
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.8
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+
+      - uid: spanner-storage-per-vcpu-high
+        title: SpannerStoragePerVCPUTooHigh
+        condition: B
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Storage per vCPU exceeds 500 GB"
+          description: "Storage allocated per vCPU exceeds the 500 GB recommended ceiling."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: |-
+                (filesystem_size{job="spanner", type="total"} / 1024) / spanner_box_vm_cpu_total{job="spanner"}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 500
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+

@@ -1,0 +1,119 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- /*
+This file performs strict pre-flight assertions during template rendering.
+If any assertion fails, Helm will immediately abort the installation/upgrade.
+*/}}
+
+{{- $platformValues := include "spanner-omni.PlatformValues" . | fromYaml -}}
+
+{{- /* Validate that image.tag cannot contain colons */}}
+{{- if contains ":" ($.Values.image.tag | default "") }}
+  {{- fail "\n\n[FATAL] .Values.image.tag cannot contain a colon (':')! If you are specifying an image digest, please explicitly set it via the 'image.digest' field instead of 'image.tag'!\n" }}
+{{- end }}
+
+{{- if not $.Values.deployment.singleServer }}
+{{- if empty $platformValues.locations }}
+  {{- fail "\n\n[FATAL] Multi-server deployments require at least one location defined in the 'locations' array! Provide locations, or set deployment.singleServer=true.\n" }}
+{{- end }}
+
+{{- /* Validate that the number of root servers in each zone is an odd number between 1 and 9 */}}
+{{- range $loc := $platformValues.locations }}
+  {{- range $zObj := $loc.zones }}
+    {{- $zoneRootServers := $zObj.rootServers | default $.Values.deployment.rootServersPerZone | int }}
+    {{- if or (lt $zoneRootServers 1) (gt $zoneRootServers 9) (eq (mod $zoneRootServers 2) 0) }}
+      {{- fail (printf "\n\n[FATAL] Zone '%s' in location '%s' has '%v' root servers configured. The number of root servers must be an odd number between 1 and 9 (i.e. 1, 3, 5, 7, or 9)!\n" $zObj.name $loc.name $zoneRootServers) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- /* deployment config validation */}}
+{{- $deployment_config := include "spanner-omni.deploymentConfig" . }}
+{{- $parsed_deployment_config := fromYaml $deployment_config }}
+{{- if not $parsed_deployment_config.name }}
+  {{- fail "\n\n[FATAL] deployment_config.yaml failed to generate a 'name' property during template rendering!\n" }}
+{{- end }}
+
+{{- /* Root servers in deployment config must be unique */}}
+{{- $rootServers := list }}
+{{- range $z := $parsed_deployment_config.zone }}
+  {{- range $rs := $z.root_server }}
+    {{- if has $rs.host $rootServers }}
+      {{- fail (printf "\n\n[FATAL] Root server '%s' is duplicated across multiple zones!\n" $rs.host) }}
+    {{- end }}
+    {{- $rootServers = append $rootServers $rs.host }}
+  {{- end }}
+{{- end }}
+
+{{- end }}
+
+
+{{/* Validate that namespace is required if there are multiple locations */}}
+{{- if gt (len $platformValues.locations) 1 }}
+{{- range $l := $platformValues.locations }}
+  {{- if empty $l.namespace }}
+    {{- fail (printf "\n\n[FATAL] Namespace is required for multi-location deployments! Location '%s' is missing a namespace.\n" $l.name) }}
+  {{- end }}
+{{- end }}
+{{- end   }}
+
+{{/* Validate that each location has unique namespace */}}
+{{- $namespaces := list }}
+{{- range $l := $platformValues.locations }}
+  {{- if has $l.namespace $namespaces }}
+    {{- fail (printf "\n\n[FATAL] Namespace '%s' is duplicated across multiple locations! Each location must have a unique namespace.\n" $l.namespace) }}
+  {{- end }}
+  {{- $namespaces = append $namespaces $l.namespace }}
+{{- end }}
+
+{{/* Validate that Release namespace must match the namespace of current location whenever location namespace is set */}}
+{{- $currentLoc := include "spanner-omni.currentLocation" . | fromYaml }}
+{{- if and $currentLoc $currentLoc.namespace }}
+{{- $effectiveNs := include "spanner-omni.namespace" . }}
+{{- if ne $effectiveNs $currentLoc.namespace }}
+  {{- fail (printf "\n\n[FATAL] Release namespace must match the namespace of current location! Release namespace '%s' does not match location '%s' namespace '%s'.\n" $effectiveNs $currentLoc.name $currentLoc.namespace) }}
+{{- end }}
+{{- end }}
+
+{{/* Validate that when multiCluster is true, there are more than one location*/}}
+{{- if $.Values.deployment.multiCluster }}
+{{- if eq (len $platformValues.locations) 1 }}
+  {{- fail "\n\n[FATAL] multiCluster is true but there is only one location. multiCluster should have more than one location.\n" }}
+{{- end }}
+{{- end }}
+
+{{/* Validate that Console is only enabled for insecure deployments */}}
+{{- if and (hasKey $.Values.console "enabled") (eq $.Values.console.enabled true) }}
+{{- if not $.Values.global.insecureMode }}
+  {{- fail "\n\n[FATAL] Console is currently supported only with insecure deployments\n" }}
+{{- end }}
+{{- end }}
+
+{{/* Validate that both featureFlagsConfigMap and spannerConfig are not provided at the same time */}}
+{{- if and $.Values.deployment.featureFlagsConfigMap $.Values.deployment.spannerConfig }}
+  {{- fail "\n\n[FATAL] Both 'deployment.featureFlagsConfigMap' and 'deployment.spannerConfig' cannot be set simultaneously! Please choose either Option 1 (inline/external config values via 'spannerConfig') OR Option 2 (referencing a pre-created ConfigMap via 'featureFlagsConfigMap').\n" }}
+{{- end }}
+
+{{/* Validate that at least one authentication method is enabled when insecureMode is false */}}
+{{- if not $.Values.global.insecureMode }}
+{{- if and (not $.Values.deployment.enableClientCertificateAuthentication) (not $.Values.deployment.enablePasswordAuthentication) }}
+  {{- fail "\n\n[FATAL] Secure mode is enabled (global.insecureMode=false), but both client certificate and password authentication are disabled! Please enable at least one authentication method (deployment.enableClientCertificateAuthentication or deployment.enablePasswordAuthentication).\n" }}
+{{- end }}
+{{- end }}
+
+
+{{/* Validate that workers are not enabled in singleServer mode */}}
+{{- if and $.Values.deployment.singleServer (and $.Values.workers $.Values.workers.enabled) }}
+  {{- fail "\n\n[FATAL] Worker nodes ('workers.enabled=true') are not supported in single-server deployments (deployment.singleServer=true)!\n" }}
+{{- end }}

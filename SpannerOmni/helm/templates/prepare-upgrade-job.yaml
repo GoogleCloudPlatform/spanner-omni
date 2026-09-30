@@ -1,0 +1,106 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# Run schema upgrade only when the binary is changed. Skip the job if image is same or single-server.
+{{- $shouldRun := true }}
+{{- if or .Values.skipPrepareUpgrade .Values.deployment.singleServer }}
+  {{- $shouldRun = false }}
+{{- end }}
+{{- $namespace := include "spanner-omni.namespace" $ }}
+{{- $stsName := "" }}
+{{- if $shouldRun }}
+  {{- $zones := (include "spanner-omni.currentLocation" $ | fromYaml).zones -}}
+  {{- if and $zones (gt (len $zones) 0) }}
+    {{- $zone := index $zones 0 }}
+    {{- $shortName := $zone.shortName | default $zone.name }}
+    {{- $rootStsName := printf "spanner-%s-rt" $shortName }}
+    {{- $sharedStsName := printf "spanner-%s" $shortName }}
+    {{- if include "spanner-omni.rootServers.dedicated" . }}
+      {{- $stsName = $rootStsName }}
+    {{- else }}
+      {{- $stsName = $sharedStsName }}
+    {{- end }}
+    {{- $sts := lookup "apps/v1" "StatefulSet" $namespace $stsName }}
+    {{- if $sts }}
+      {{- $oldImage := (index $sts.spec.template.spec.containers 0).image }}
+      {{- $newImage := include "spanner-omni.image" $ }}
+      {{- if eq $oldImage $newImage }}
+        {{- $shouldRun = false }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- if $shouldRun }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: {{ $namespace }}
+  name: spanner-prepare-for-upgrade
+  labels:
+    {{- include "spanner-omni.labels" $ | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "-5"
+spec:
+  # Fail fast on the first error to abort the rollout immediately instead of crash looping.
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "spanner-omni.labels" $ | nindent 8 }}
+    spec:
+      {{- if .Values.image.pullSecret }}
+      imagePullSecrets:
+      - name: {{ .Values.image.pullSecret }}
+      {{- end }}
+      restartPolicy: Never
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: spanner-upgrade
+          image: {{ include "spanner-omni.image" $ | quote }}
+          {{- if .Values.image.pullPolicy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.jobs.resources | nindent 12 }}
+          command: ["/google/spanner/bin/spanner_server"]
+          args:
+            - "prepare_for_upgrade"
+            - "--root_server={{ $stsName }}-0.pod.{{ include "spanner-omni.namespace" $ }}"
+            - "--logtostderr=true"
+          volumeMounts:
+            - name: tls-certs
+              mountPath: "/spanner/tls"
+              readOnly: true
+            - name: spanner-data
+              mountPath: /spanner
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: tls-certs
+            optional: true
+            defaultMode: 256
+        - name: spanner-data
+          emptyDir: {}
+{{- end }}

@@ -1,0 +1,60 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Insecure Mode Tests for Monitoring
+templates:
+  - templates/prometheus/config.yaml
+
+tests:
+  - it: should use https when global.insecureMode is false
+    set:
+      global:
+        insecureMode: false
+    asserts:
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "scheme: https"
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: 'url: "https://spanner\..*\.svc\.cluster\.local:15012/metrics/targets"'
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: 'url: "https://spanner\..*\.svc\.cluster\.local:15012/metrics/targets/workers"'
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "honor_labels: true"
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "regex: 'localhost:\\(\\.\\*\\)'"
+
+  - it: should use http when global.insecureMode is true
+    set:
+      global:
+        insecureMode: true
+    asserts:
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "scheme: http"
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: 'url: "http://spanner\..*\.svc\.cluster\.local:15012/metrics/targets"'
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: 'url: "http://spanner\..*\.svc\.cluster\.local:15012/metrics/targets/workers"'
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "honor_labels: true"
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "regex: 'localhost:\\(\\.\\*\\)'"

@@ -1,0 +1,101 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- if include "spanner-omni.shouldSupportStaggeredRollout" $ }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "spanner-omni.fullname" $ }}-rollout-{{ .Release.Revision }}
+  namespace: {{ include "spanner-omni.namespace" $ }}
+  labels:
+    {{- include "spanner-omni.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: spanner-rollout
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "spanner-omni.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: spanner-rollout
+    spec:
+      serviceAccountName: {{ include "spanner-omni.fullname" $ }}-rollout
+      restartPolicy: OnFailure
+      {{- if .Values.rollout.image.pullSecret }}
+      imagePullSecrets:
+      - name: {{ .Values.rollout.image.pullSecret }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: rollout-controller
+        image: "{{ .Values.rollout.image.repository }}{{ if .Values.rollout.image.digest }}@{{ .Values.rollout.image.digest }}{{ else }}:{{ .Values.rollout.image.tag | default "latest" }}{{ end }}"
+        {{- if .Values.rollout.image.pullPolicy }}
+        imagePullPolicy: {{ .Values.rollout.image.pullPolicy }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.jobs.resources | nindent 10 }}
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -e
+          
+          STS_NAMES=({{- range $ss := (include "spanner-omni.statefulSets" $ | fromYamlArray) }}"{{ $ss.name }}" {{ end }})
+          NAMESPACE="{{ include "spanner-omni.namespace" $ }}"
+          PATCH_PAYLOAD='[{"op": "replace", "path": "/spec/updateStrategy/rollingUpdate/partition", "value": 0}]'
+          
+          echo "Starting rollout for StatefulSets..."
+          
+          for ((i=0; i<${#STS_NAMES[@]}; i++)); do
+            sts="${STS_NAMES[$i]}"
+            echo "Waiting for StatefulSet $sts to observe the latest generation..."
+            
+            # Wait for controller to observe the change
+            while true; do
+              OBSERVED_GEN=$(kubectl get statefulset $sts -n $NAMESPACE -o jsonpath='{.status.observedGeneration}')
+              METADATA_GEN=$(kubectl get statefulset $sts -n $NAMESPACE -o jsonpath='{.metadata.generation}')
+              if [ "$OBSERVED_GEN" = "$METADATA_GEN" ]; then
+                break
+              fi
+              echo "Waiting for controller to observe generation $METADATA_GEN... current observed: $OBSERVED_GEN"
+              sleep 2
+            done
+            
+            CURRENT_REV=$(kubectl get statefulset $sts -n $NAMESPACE -o jsonpath='{.status.currentRevision}')
+            UPDATE_REV=$(kubectl get statefulset $sts -n $NAMESPACE -o jsonpath='{.status.updateRevision}')
+            # Reset partition to 0 to ensure no pods are left locked
+            kubectl patch statefulset $sts -n $NAMESPACE --type='json' -p="$PATCH_PAYLOAD"
+
+            if [ "$CURRENT_REV" = "$UPDATE_REV" ]; then
+              echo "No template changes detected for $sts. Skipping wait for this StatefulSet."
+              continue
+            fi
+
+            echo "Starting rollout for $sts..."
+            echo "Waiting for rollout of $sts to complete..."
+            kubectl rollout status statefulset/$sts -n $NAMESPACE
+            
+            if [ $i -lt $(( ${#STS_NAMES[@]} - 1 )) ]; then
+              echo "StatefulSet $sts rollout completed. Waiting for {{ .Values.rollout.waitSeconds | default 600 }} seconds before next StatefulSet..."
+              sleep {{ .Values.rollout.waitSeconds | default 600 }}
+            fi
+          done
+          echo "Rollout completed for all StatefulSets..."
+{{- end }}

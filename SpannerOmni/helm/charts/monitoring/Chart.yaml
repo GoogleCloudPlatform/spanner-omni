@@ -12,4 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+apiVersion: v2
+name: monitoring
+description: A Helm chart for Spanner Omni monitoring stack
+type: application
+version: 1.0.0
+appVersion: "2026.r4-lts"

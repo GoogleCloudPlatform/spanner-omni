@@ -1,0 +1,61 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Sample Spanner deployment configuration corresponding to SpannerOmni/samples/helm/values-multi-region.yaml
+
+name: spanner-omni
+location:
+  - name: us-west1
+  - name: us-west2
+  - name: us-west3
+zone:
+  - name: us-west1-a
+    location: us-west1
+    single_server: false
+    root_server:
+      - host: spanner-a-rt-0.pod.spanner-ns-usw1
+      - host: spanner-a-rt-1.pod.spanner-ns-usw1
+      - host: spanner-a-rt-2.pod.spanner-ns-usw1
+  - name: us-west1-b
+    location: us-west1
+    single_server: false
+    root_server:
+      - host: spanner-b-rt-0.pod.spanner-ns-usw1
+      - host: spanner-b-rt-1.pod.spanner-ns-usw1
+      - host: spanner-b-rt-2.pod.spanner-ns-usw1
+  - name: us-west2-a
+    location: us-west2
+    single_server: false
+    root_server:
+      - host: spanner-a-rt-0.pod.spanner-ns-usw2
+      - host: spanner-a-rt-1.pod.spanner-ns-usw2
+      - host: spanner-a-rt-2.pod.spanner-ns-usw2
+  - name: us-west2-b
+    location: us-west2
+    single_server: false
+    root_server:
+      - host: spanner-b-rt-0.pod.spanner-ns-usw2
+      - host: spanner-b-rt-1.pod.spanner-ns-usw2
+      - host: spanner-b-rt-2.pod.spanner-ns-usw2
+  - name: us-west3-a
+    location: us-west3
+    single_server: false
+    replica_type: WITNESS
+    root_server:
+      - host: spanner-a-rt-0.pod.spanner-ns-usw3
+      - host: spanner-a-rt-1.pod.spanner-ns-usw3
+      - host: spanner-a-rt-2.pod.spanner-ns-usw3
+deployment_settings:
+  security_settings:
+    insecure_mode: true

@@ -12,4 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+createStorageClasses: true
+
+storageClasses:
+  - name: vsphere-fast
+    provisioner: csi.vsphere.vmware.com
+
+dataStorageClass: vsphere-fast
+logsStorageClass: vsphere-fast
+
+locations:
+  - name: onprem
+    zones:
+      - name: zone-0
+        shortName: "a"
+      - name: zone-1
+        shortName: "b"
+      - name: zone-2
+        shortName: "c"
+
+monitoring:
+  enabled: true

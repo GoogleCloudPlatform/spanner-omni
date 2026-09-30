@@ -1,0 +1,371 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- $platformValues := include "spanner-omni.PlatformValues" $ | fromYaml -}}
+
+# StatefulSet configuration for Spanner instances.
+
+# One chart per location. Hence find the location for which Chart is deployed by comparing currentLocation value.
+{{- $isSingleServer := $.Values.deployment.singleServer }}
+
+# Root server overrides. Defaulted to an empty dict so an explicitly nil 'rootServers' does not fail rendering.
+{{- $rootServers := dict }}
+{{- if and $.Values.deployment (dig "rootServers" nil $.Values.deployment) (kindIs "map" $.Values.deployment.rootServers) }}
+  {{- $rootServers = deepCopy $.Values.deployment.rootServers }}
+{{- end }}
+
+# Render statefulset(s).
+{{- $statefulSets := include "spanner-omni.statefulSets" $ | fromYamlArray }}
+{{- range $ss := $statefulSets }}
+{{- $zone := $ss.zone }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $ss.name }}
+  namespace: {{ include "spanner-omni.namespace" $ }}
+  labels:
+    {{- include "spanner-omni.labels" $ | nindent 4 }}
+    {{- if $ss.type }}
+    server-type: {{ $ss.type }}
+    {{- end }}
+spec:
+  replicas: {{ $ss.replicas }}
+  selector:
+    matchLabels:
+      {{- include "spanner-omni.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: spanner
+  serviceName: pod
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: {{ $ss.maxUnavailable }}
+      {{- if include "spanner-omni.shouldSupportStaggeredRollout" $ }}
+      partition: {{ $ss.replicas }}
+      {{- end }}
+  persistentVolumeClaimRetentionPolicy:
+    # We want to retain so that disk are retained to handle accidental deletion or scale down.
+    whenDeleted: Retain
+    whenScaled: Retain
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/spanner-config.yaml") $ | sha256sum }}
+        cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "tmp-volume"
+        {{- if $.Values.deployment.featureFlagsConfigMap }}
+        spanner/config-map-name: {{ $.Values.deployment.featureFlagsConfigMap }}
+        {{- end }}
+      labels:
+        {{- include "spanner-omni.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: spanner
+        zone: {{ $zone.name }}
+        app: spanner
+        {{- if $ss.type }}
+        server-type: {{ $ss.type }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- $nodeSelector := $.Values.nodeSelector }}
+      {{- if $ss.isRoot }}
+        {{- $nodeSelector = dig "nodeSelector" $nodeSelector $rootServers }}
+      {{- end }}
+      {{- if or (not $isSingleServer) $nodeSelector }}
+      nodeSelector:
+        {{- if not $isSingleServer }}
+        topology.kubernetes.io/zone: {{ $zone.name }}
+        {{- end }}
+        {{- with $nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- $tolerations := $.Values.tolerations }}
+      {{- if $ss.isRoot }}
+        {{- $tolerations = dig "tolerations" $tolerations $rootServers }}
+      {{- end }}
+      {{- with $tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $.Values.image.pullSecret }}
+      imagePullSecrets:
+      - name: {{ $.Values.image.pullSecret }}
+      {{- end }}
+      securityContext:
+        fsGroup: 2000 # File group for data volume.
+        fsGroupChangePolicy: "OnRootMismatch" # Spanner internal depends on file permissions for its functionality. Not setting here makes K8s change recursively file permissions for all files when container is moved or pod is deleted and recreated. This leads to spanner not coming up.
+        {{- toYaml $.Values.securityContext.pod | nindent 8 }}
+      {{- $affinity := $.Values.affinity }}
+      {{- if $ss.isRoot }}
+        {{- $affinity = dig "affinity" $affinity $rootServers }}
+      {{- end }}
+      affinity:
+        {{- if $affinity }}
+        {{- toYaml $affinity | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                {{- include "spanner-omni.selectorLabels" $ | nindent 16 }}
+                app.kubernetes.io/component: spanner
+            topologyKey: "kubernetes.io/hostname"
+        {{- end }}
+      {{- if $platformValues.extraInitContainers }}
+      initContainers:
+        {{- tpl (toYaml $platformValues.extraInitContainers) $ | nindent 8 }}
+      {{- end }}
+      containers:
+      - args:
+        - "start"
+        {{- if $isSingleServer }}
+        - "--server-address=localhost:{{ $.Values.deployment.basePort }}"
+        - "--zone=default"
+        {{- else }}
+        - "--server-address={{ $ss.name }}-$(SPANNER_POD_INDEX).pod.{{ include "spanner-omni.namespace" $ }}:{{ $.Values.deployment.basePort }}"
+        - "--zone={{ $zone.name }}"
+        {{- end }}
+        {{- if $isSingleServer }}
+        - "--root"
+        {{- else if $ss.type }}
+        {{- if $ss.isRoot }}
+        - "--root"
+        {{- else }}
+        - "--join-servers={{ $ss.joinServers }}"
+        {{- end }}
+        {{- end }}
+        {{- if $.Values.deployment.listenAddresses }}
+        - "--listen-addresses={{ $.Values.deployment.listenAddresses }}"
+        {{- end }}
+        - "--base-dir=/spanner"
+        {{- if $isSingleServer }}
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  if [ ! -f /spanner/data/spanhostfs/vm_id ] && [ -f /etc/spanner-config/deployment_config.yaml ]; then
+                    /google/spanner/bin/spanner deployment create \
+                      --base-dir=/spanner \
+                      --config-file=/etc/spanner-config/deployment_config.yaml \
+                      {{- if $.Values.deployment.adminPasswordSecret }}
+                      --admin-password-file=/etc/admin-password/password \
+                      {{- end }}
+                      --server-health-check-timeout=60s > /spanner/deployment_create.log 2>&1
+                  fi
+        {{- end }}
+        name: spanner
+        image: {{ include "spanner-omni.image" $ | quote }}
+        imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        readinessProbe:
+          httpGet:
+            path: /healthz?require_api_ready=1
+            port: {{ include "spanner-omni.uiPort" $ }}
+            {{- if eq $.Values.global.insecureMode false }}
+            scheme: HTTPS
+            {{- end }}
+          initialDelaySeconds: {{ $.Values.probes.readiness.initialDelaySeconds }}
+          periodSeconds: {{ $.Values.probes.readiness.periodSeconds }}
+          timeoutSeconds: {{ $.Values.probes.readiness.timeoutSeconds }}
+          failureThreshold: {{ $.Values.probes.readiness.failureThreshold }}
+        {{- if $.Values.probes.liveness.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: {{ include "spanner-omni.uiPort" $ }}
+            {{- if eq $.Values.global.insecureMode false }}
+            scheme: HTTPS
+            {{- end }}
+          initialDelaySeconds: {{ $.Values.probes.liveness.initialDelaySeconds }}
+          periodSeconds: {{ $.Values.probes.liveness.periodSeconds }}
+          timeoutSeconds: {{ $.Values.probes.liveness.timeoutSeconds }}
+          failureThreshold: {{ $.Values.probes.liveness.failureThreshold }}
+        {{- end }}
+        {{- if $.Values.probes.startup.enabled }}
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: {{ include "spanner-omni.uiPort" $ }}
+            {{- if eq $.Values.global.insecureMode false }}
+            scheme: HTTPS
+            {{- end }}
+          initialDelaySeconds: {{ $.Values.probes.startup.initialDelaySeconds }}
+          periodSeconds: {{ $.Values.probes.startup.periodSeconds }}
+          timeoutSeconds: {{ $.Values.probes.startup.timeoutSeconds }}
+          failureThreshold: {{ $.Values.probes.startup.failureThreshold }}
+        {{- end }}
+        securityContext:
+          {{- $containerSecContext := deepCopy $.Values.securityContext.container }}
+          {{- if or (get $containerSecContext "privileged") $platformValues.forcePrivilegedContainer }}
+          {{- $_ := set $containerSecContext "privileged" true }}
+          {{- $_ := set $containerSecContext "allowPrivilegeEscalation" true }}
+          {{- end }}
+          {{- toYaml $containerSecContext | nindent 10 }}
+        resources:
+          {{- $cpu := $.Values.resources.cpu }}
+          {{- $mem := $.Values.resources.memory }}
+          {{- if $ss.isRoot }}
+            {{- $cpu = dig "cpu" $cpu (default dict $rootServers.resources) }}
+            {{- $mem = dig "memory" $mem (default dict $rootServers.resources) }}
+          {{- end }}
+          requests:
+            cpu: "{{ $cpu }}"
+            memory: "{{ $mem }}"
+          limits:
+            cpu: "{{ $cpu }}"
+            memory: "{{ $mem }}"
+        env:
+        - name: SPANNER_PUBLIC_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: SPANNER_POD_INDEX
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['apps.kubernetes.io/pod-index']
+
+        {{- $endpoint := $.Values.deployment.traceExporterEndpoint | default "" }}
+        {{- if and (not $endpoint) (and $.Values.monitoring $.Values.monitoring.enabled) }}
+          {{- $monNs := $.Values.monitoring.namespace | default "monitoring" }}
+          {{- $otlpPort := $.Values.monitoring.jaeger.ports.otlpGrpc }}
+          {{- $endpoint = printf "dns:///jaeger.%s.svc.cluster.local:%v" $monNs $otlpPort }}
+        {{- end }}
+        {{- if $endpoint }}
+        - name: SPANNER_TRACE_EXPORTER_ENDPOINT
+          value: "{{ $endpoint }}"
+        {{- end }}
+        {{- if and (not (include "spanner-omni.rootServers.dedicated" $)) (ge (int ($zone.rootServers | default $.Values.deployment.rootServersPerZone | default 1)) 0) }}
+        - name: SPANNER_ROOT_SERVERS_COUNT
+          value: "{{ $zone.rootServers | default $.Values.deployment.rootServersPerZone | default 1 }}"
+        {{- end }}
+        - name: SPANNER_USE_SINGLE_TIME_SERVER
+          value: "{{ $.Values.deployment.useSingleTimeServer | default false }}"
+        {{- if and (not $isSingleServer) (not (include "spanner-omni.rootServers.dedicated" $)) }}
+        - name: JOIN_SERVERS
+          value: "{{ $ss.joinServers }}"
+        {{- end }}
+        {{- if $.Values.extraEnvVars }}
+        {{- range $.Values.extraEnvVars }}
+        - name: {{ .name }}
+          value: {{ .value | quote }}
+        {{- end }}
+        {{- end }}
+        volumeMounts:
+        - name: data-volume
+          mountPath: /spanner
+        - name: logs-volume
+          mountPath: /spanner/logs
+        - name: tls-certs
+          mountPath: "/spanner/tls"
+          readOnly: true
+        - name: spanner-license-key
+          mountPath: "/spanner/license"
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: spanner-config
+          mountPath: /spanner/conf/spanner.cfg
+          subPath: spanner.cfg
+        {{- if $isSingleServer }}
+        - name: deployment-config
+          mountPath: /etc/spanner-config
+        {{- if $.Values.deployment.adminPasswordSecret }}
+        - name: admin-password
+          mountPath: /etc/admin-password
+          readOnly: true
+        {{- end }}
+        {{- end }}
+        {{- if $platformValues.extraVolumeMounts }}
+        {{- toYaml $platformValues.extraVolumeMounts | nindent 8 }}
+        {{- end }}
+      terminationGracePeriodSeconds: 90
+      volumes:
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: "{{ $.Values.storage.tmp.size }}"
+        - name: tls-certs
+          secret:
+            secretName: tls-certs
+            optional: true
+            defaultMode: 256
+        - name: spanner-license-key
+          secret:
+            secretName: spanner-license-key
+            optional: true
+            defaultMode: 256
+            items:
+              - key: LICENSE_KEY
+                path: license
+        - name: spanner-config
+          configMap:
+            name: {{ $.Values.deployment.featureFlagsConfigMap | default "spanner-config" }}
+        {{- if $isSingleServer }}
+        - name: deployment-config
+          configMap:
+            name: spanner-deployment-config
+        {{- if $.Values.deployment.adminPasswordSecret }}
+        - name: admin-password
+          secret:
+            secretName: {{ $.Values.deployment.adminPasswordSecret }}
+            defaultMode: 384
+            items:
+              - key: password
+                path: password
+        {{- end }}
+        {{- end }}
+        {{- if $platformValues.extraVolumes }}
+        {{- toYaml $platformValues.extraVolumes | nindent 8 }}
+        {{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data-volume
+      labels:
+        zone: {{ $zone.name }}
+        type: data
+    spec:
+      {{- if $platformValues.dataStorageClass }}
+      storageClassName: "{{ $platformValues.dataStorageClass }}"
+      {{- end }}
+      volumeMode: Filesystem
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          {{- $dataSize := $.Values.storage.data.size }}
+          {{- if $ss.isRoot }}
+            {{- $dataSize = dig "data" "size" $dataSize (default dict $rootServers.storage) }}
+          {{- end }}
+          storage: "{{ $dataSize }}"
+  - metadata:
+      name: logs-volume
+      labels:
+        zone: {{ $zone.name }}
+        type: log
+    spec:
+      {{- if $platformValues.logsStorageClass }}
+      storageClassName: "{{ $platformValues.logsStorageClass }}"
+      {{- end }}
+      volumeMode: Filesystem
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          {{- $logsSize := $.Values.storage.logs.size }}
+          {{- if $ss.isRoot }}
+            {{- $logsSize = dig "logs" "size" $logsSize (default dict $rootServers.storage) }}
+          {{- end }}
+          storage: "{{ $logsSize }}"
+{{- end }}

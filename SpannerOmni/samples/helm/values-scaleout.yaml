@@ -12,4 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+# Sample configuration for a 3-zone scaleout (HA) regional deployment with 5 replicas
+# (3 dedicated root servers and 2 non-root servers) per zone.
+
+global:
+  platform: gke
+
+deployment:
+  singleServer: false
+  replicasPerZone: 5
+  rootServersPerZone: 3
+
+locations:
+  - name: us-east1
+    zones:
+      - name: "us-east1-b"
+        shortName: "a"
+      - name: "us-east1-c"
+        shortName: "b"
+      - name: "us-east1-d"
+        shortName: "c"

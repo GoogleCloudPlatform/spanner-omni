@@ -1,0 +1,1181 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Spanner StatefulSet Tests
+templates:
+  - spanner_statefulset.yaml
+  - spanner-config.yaml
+
+tests:
+  - it: should configure HTTPS probes when global.insecureMode is false
+    set:
+      global:
+        insecureMode: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.scheme
+          value: HTTPS
+        template: spanner_statefulset.yaml
+
+  - it: should format image URL using colon for standard tags
+    set:
+      image:
+        repository: custom-repo/spanner
+        tag: 2026.r1-beta
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: custom-repo/spanner:2026.r1-beta
+        template: spanner_statefulset.yaml
+
+  - it: should format image URL using at-sign for explicit digest
+    set:
+      image:
+        repository: custom-repo/spanner
+        tag: latest
+        digest: sha256:4d34b6c92ff7416b2bd9c1f22044b19b6c74ec48581c8f509af097aaecf7baf9
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: custom-repo/spanner@sha256:4d34b6c92ff7416b2bd9c1f22044b19b6c74ec48581c8f509af097aaecf7baf9
+        template: spanner_statefulset.yaml
+
+  - it: should configure HTTP probes when global.insecureMode is true
+    set:
+      global:
+        insecureMode: true
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.scheme
+        template: spanner_statefulset.yaml
+
+  - it: should render single statefulset named spanner-a when deployment.singleServer is true
+    set:
+      deployment:
+        singleServer: true
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.replicas
+          value: 1
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "start"
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--root"
+        template: spanner_statefulset.yaml
+      - notExists:
+          path: metadata.labels["server-type"]
+        template: spanner_statefulset.yaml
+
+  - it: should configure single server mode without --listen-addresses by default
+    set:
+      deployment:
+        singleServer: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "start"
+        template: spanner_statefulset.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--listen-addresses="
+        template: spanner_statefulset.yaml
+
+  - it: should configure single server mode with custom listenAddresses when set
+    set:
+      deployment:
+        singleServer: true
+        listenAddresses: "localhost"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "start"
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--listen-addresses=localhost"
+        template: spanner_statefulset.yaml
+
+  - it: should not pass --listen-addresses when deployment.listenAddresses is empty
+    set:
+      deployment:
+        singleServer: true
+        listenAddresses: ""
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "start"
+        template: spanner_statefulset.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--listen-addresses="
+        template: spanner_statefulset.yaml
+
+  - it: should configure custom listenAddresses in multi-server mode when set
+    set:
+      deployment:
+        listenAddresses: "0.0.0.0,[::]"
+      locations:
+        - name: us
+          namespace: ns1
+          zones:
+            - name: us-a
+              rootServers: 1
+    release:
+      namespace: ns1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--listen-addresses=0.0.0.0,[::]"
+        template: spanner_statefulset.yaml
+
+  - it: should configure localhost server-address, postStart hook, and mount admin-password in single-server mode
+    set:
+      deployment:
+        singleServer: true
+        adminPasswordSecret: "my-admin-password-secret"
+      global:
+        insecureMode: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "start"
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--root"
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--server-address=localhost:15000"
+        template: spanner_statefulset.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "spanner-a-0.pod"
+        template: spanner_statefulset.yaml
+      - isNull:
+          path: spec.template.spec.initContainers
+        template: spanner_statefulset.yaml
+      - isNotNull:
+          path: spec.template.spec.containers[0].lifecycle.postStart
+        template: spanner_statefulset.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].lifecycle.postStart.exec.command[2]
+          pattern: "/google/spanner/bin/spanner deployment create"
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: admin-password
+            secret:
+              defaultMode: 384
+              items:
+                - key: password
+                  path: password
+              secretName: my-admin-password-secret
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: admin-password
+            mountPath: /etc/admin-password
+            readOnly: true
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: deployment-config
+            mountPath: /etc/spanner-config
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tls-certs
+            mountPath: /spanner/tls
+            readOnly: true
+        template: spanner_statefulset.yaml
+
+  - it: should mount tls-certs at /spanner/tls in multi-server mode by default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tls-certs
+            mountPath: /spanner/tls
+            readOnly: true
+        template: spanner_statefulset.yaml
+
+  - it: should use default storage class when no platform is set
+    asserts:
+      - isNull:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+        template: spanner_statefulset.yaml
+      - isNull:
+          path: spec.volumeClaimTemplates[1].spec.storageClassName
+        template: spanner_statefulset.yaml
+
+  - it: should use platform storage class when platform is set
+    set:
+      global:
+        platform: gke
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: premium-rwo
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.volumeClaimTemplates[1].spec.storageClassName
+          value: standard-rwo
+        template: spanner_statefulset.yaml
+
+  - it: should override platform when top-level values are provided
+    set:
+      global:
+        platform: gke
+      dataStorageClass: custom-override-sc
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: custom-override-sc
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.volumeClaimTemplates[1].spec.storageClassName
+          value: standard-rwo
+        template: spanner_statefulset.yaml
+
+  - it: should set extra environment variables when extraEnvVars is passed
+    set:
+      extraEnvVars:
+        - name: API_KEY
+          value: "12345"
+        - name: TEST_MODE
+          value: "true"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: API_KEY
+            value: "12345"
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TEST_MODE
+            value: "true"
+        template: spanner_statefulset.yaml
+
+  - it: should set maxUnavailable to at least 1 when calculated percentage is 0
+    set:
+      deployment:
+        replicasPerZone: 5
+        maxUnavailablePercentage: 5
+    asserts:
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxUnavailable
+          value: 1
+        template: spanner_statefulset.yaml
+
+  - it: should set maxUnavailable to calculated value when it is greater than 1
+    set:
+      deployment:
+        replicasPerZone: 43
+        rootServersPerZone: 3
+        maxUnavailablePercentage: 5
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+    asserts:
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxUnavailable
+          value: 2
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+
+  - it: should set maxUnavailable based on zone's replica count.
+    set:
+      deployment:
+        replicasPerZone: 5
+        maxUnavailablePercentage: 5
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              replicas: 43
+              rootServers: 3
+    asserts:
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxUnavailable
+          value: 2
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+
+  - it: should fix maxUnavailable to 1 for dedicated root server statefulsets regardless of replicas
+    set:
+      deployment:
+        replicasPerZone: 40
+        rootServersPerZone: 5
+        maxUnavailablePercentage: 10
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: a
+    asserts:
+      - equal:
+          path: metadata.name
+          value: spanner-a
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxUnavailable
+          value: 3
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a-rt
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.maxUnavailable
+          value: 1
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+
+  - it: should configure probes with values from values.yaml
+    set:
+      probes:
+        readiness:
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          timeoutSeconds: 10
+          failureThreshold: 5
+        liveness:
+          enabled: true
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 6
+        startup:
+          enabled: true
+          initialDelaySeconds: 40
+          periodSeconds: 40
+          timeoutSeconds: 20
+          failureThreshold: 7
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+          value: 20
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.initialDelaySeconds
+          value: 30
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.initialDelaySeconds
+          value: 40
+        template: spanner_statefulset.yaml
+
+  - it: should not render liveness and startup probes when disabled
+    set:
+      probes:
+        liveness:
+          enabled: false
+        startup:
+          enabled: false
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].livenessProbe
+        template: spanner_statefulset.yaml
+      - isNull:
+          path: spec.template.spec.containers[0].startupProbe
+        template: spanner_statefulset.yaml
+
+  - it: should configure pod security context with values from values.yaml
+    set:
+      securityContext:
+        pod:
+          runAsUser: 1000
+          runAsGroup: 1000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 1000
+        template: spanner_statefulset.yaml
+
+  - it: should configure container security context with values from values.yaml
+    set:
+      securityContext:
+        container:
+          readOnlyRootFilesystem: false
+          privileged: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: false
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: true
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: true
+        template: spanner_statefulset.yaml
+
+  - it: should override affinity when specified in values.yaml
+    set:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: cloud.google.com/gke-nodepool
+                operator: In
+                values:
+                - spanner_db_ng
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: cloud.google.com/gke-nodepool
+        template: spanner_statefulset.yaml
+
+  - it: should use default pod anti-affinity when not specified
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey
+          value: kubernetes.io/hostname
+        template: spanner_statefulset.yaml
+
+  - it: should set partition when rollout.staggered is true and multiple zones on upgrade
+    set:
+      rollout:
+        staggered: true
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+              replicas: 3
+            - name: "test-zone-b"
+              replicas: 2
+    release:
+      upgrade: true
+    asserts:
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.partition
+          value: 3
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+
+  - it: should not set partition when rollout.staggered is true and multiple zones on install
+    set:
+      rollout:
+        staggered: true
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+              replicas: 3
+            - name: "test-zone-b"
+              replicas: 2
+    asserts:
+      - isNull:
+          path: spec.updateStrategy.rollingUpdate.partition
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+
+  - it: should not set partition when rollout.staggered is true but only one zone
+    set:
+      rollout:
+        staggered: true
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+              replicas: 3
+    asserts:
+      - isNull:
+          path: spec.updateStrategy.rollingUpdate.partition
+        template: spanner_statefulset.yaml
+
+  - it: should not set partition when rollout.staggered is false
+    set:
+      rollout:
+        staggered: false
+    asserts:
+      - isNull:
+          path: spec.updateStrategy.rollingUpdate.partition
+        template: spanner_statefulset.yaml
+
+  - it: should add extra volumes and volume mounts when specified
+    set:
+      extraVolumes:
+        - name: test-volume
+          emptyDir: {}
+      extraVolumeMounts:
+        - name: test-volume
+          mountPath: /test/path
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: test-volume
+            emptyDir: {}
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: test-volume
+            mountPath: /test/path
+        template: spanner_statefulset.yaml
+
+  - it: should mount /dev/vmclock0 when platform is eks
+    set:
+      global:
+        platform: eks
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: vmclock
+            hostPath:
+              path: /dev/vmclock0
+              type: CharDevice
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: vmclock
+            mountPath: /dev/vmclock0
+            readOnly: true
+        template: spanner_statefulset.yaml
+
+  - it: should add extra init containers when platform is eks
+    set:
+      global:
+        platform: eks
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: vmclock-chmod
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.initContainers[0].command
+          value: ['chmod', '644', '/dev/vmclock0']
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.runAsUser
+          value: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.privileged
+          value: true
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].name
+          value: vmclock
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].mountPath
+          value: /dev/vmclock0
+        template: spanner_statefulset.yaml
+
+  - it: should not mount /dev/vmclock0 when platform is gke
+    set:
+      global:
+        platform: gke
+    asserts:
+      - isNull:
+          path: spec.template.spec.volumes[?(@.name == "vmclock")]
+        template: spanner_statefulset.yaml
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "vmclock")]
+        template: spanner_statefulset.yaml
+
+  - it: should set privileged and allowPrivilegeEscalation when forcePrivilegedContainer is true
+    set:
+      forcePrivilegedContainer: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: true
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: true
+        template: spanner_statefulset.yaml
+
+  - it: should configure custom nodeSelector and tolerations when provided
+    set:
+      nodeSelector:
+        disktype: ssd
+        arch: amd64
+      tolerations:
+        - key: "database"
+          operator: "Equal"
+          value: "spanner"
+          effect: "NoSchedule"
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector.disktype
+          value: ssd
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.nodeSelector.arch
+          value: amd64
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: database
+        template: spanner_statefulset.yaml
+  - it: should configure correct join args and root flag on split root and non-root statefulsets
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.replicas
+          value: 2
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--join-servers=spanner-a-rt-0.pod.NAMESPACE,spanner-a-rt-1.pod.NAMESPACE,spanner-a-rt-2.pod.NAMESPACE"
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - notExists:
+          path: spec.template.spec.containers[0].env[?(@.name == "SPANNER_ROOT_SERVERS_COUNT")]
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - notExists:
+          path: spec.template.spec.containers[0].env[?(@.name == "JOIN_SERVERS")]
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - notExists:
+          path: spec.selector.matchLabels["server-type"]
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a-rt
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.replicas
+          value: 3
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--root"
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - notExists:
+          path: spec.template.spec.containers[0].env[?(@.name == "SPANNER_ROOT_SERVERS_COUNT")]
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - notExists:
+          path: spec.template.spec.containers[0].env[?(@.name == "JOIN_SERVERS")]
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - notExists:
+          path: spec.selector.matchLabels["server-type"]
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+
+
+  - it: should apply custom nodeSelector, resources, and 10Gi storage for rootServers
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+        rootServers:
+          nodeSelector:
+            cloud.google.com/gke-nodepool: root-pool
+          resources:
+            cpu: "2"
+            memory: "4Gi"
+          storage:
+            data:
+              size: "10Gi"
+            logs:
+              size: "10Gi"
+      nodeSelector:
+        cloud.google.com/gke-nodepool: non-root-servers-pool
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector["cloud.google.com/gke-nodepool"]
+          value: non-root-servers-pool
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: "100Gi"
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.nodeSelector["cloud.google.com/gke-nodepool"]
+          value: root-pool
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "2"
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: "4Gi"
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: "10Gi"
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.volumeClaimTemplates[1].spec.resources.requests.storage
+          value: "10Gi"
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+
+  - it: should render dedicated root and non-root statefulsets across multiple zones
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+            - name: "us-central1-b"
+              shortName: "b"
+    asserts:
+      - hasDocuments:
+          count: 4
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a-rt
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-b
+        documentIndex: 2
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-b-rt
+        documentIndex: 3
+        template: spanner_statefulset.yaml
+
+  - it: should render dedicated statefulsets by default without explicit rootServers config
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a-rt
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+
+  - it: should not include server-type in spec.selector.matchLabels
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+    asserts:
+      - notExists:
+          path: spec.selector.matchLabels["server-type"]
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - notExists:
+          path: spec.selector.matchLabels["server-type"]
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.labels["server-type"]
+          value: non-root
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.metadata.labels["server-type"]
+          value: non-root
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.labels["server-type"]
+          value: root
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.template.metadata.labels["server-type"]
+          value: root
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+
+  - it: should configure correct join-servers arg on non-root statefulset and root flag on root statefulset
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--join-servers=spanner-a-rt-0.pod.NAMESPACE,spanner-a-rt-1.pod.NAMESPACE,spanner-a-rt-2.pod.NAMESPACE"
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--root"
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+
+  - it: should ignore dedicated root servers for single-server zones in a multi-zone deployment
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+            - name: "us-central1-b"
+              shortName: "b"
+              singleServer: true
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a-rt
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-b
+        documentIndex: 2
+        template: spanner_statefulset.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--root"
+        documentIndex: 2
+        template: spanner_statefulset.yaml
+
+  - it: should safely render without error when deployment.rootServers is explicitly null
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+        rootServers: null
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: spanner_statefulset.yaml
+
+  - it: should render spanner-a without dedicated root statefulset for a single-server zone
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 3
+        rootServersPerZone: 3
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+              singleServer: true
+              replicas: 1
+            - name: "us-central1-b"
+              shortName: "b"
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.replicas
+          value: 1
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - notExists:
+          path: metadata.labels["server-type"]
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--root"
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-b-rt
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+
+  - it: should render dedicated root statefulsets for regional deployment (1 server per zone)
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 1
+        rootServersPerZone: 1
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+            - name: "us-central1-b"
+              shortName: "b"
+            - name: "us-central1-c"
+              shortName: "c"
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a-rt
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.replicas
+          value: 1
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.labels["server-type"]
+          value: root
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--root"
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-b-rt
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-c-rt
+        documentIndex: 2
+        template: spanner_statefulset.yaml
+
+  - it: should render dedicated root statefulsets when all servers are root servers (replicas == rootServers)
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 3
+        rootServersPerZone: 3
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+            - name: "us-central1-b"
+              shortName: "b"
+            - name: "us-central1-c"
+              shortName: "c"
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a-rt
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.replicas
+          value: 3
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.labels["server-type"]
+          value: root
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--root"
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-b-rt
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-c-rt
+        documentIndex: 2
+        template: spanner_statefulset.yaml
+
+  - it: should render both spanner-a and spanner-a-rt when replicasPerZone exceeds rootServersPerZone
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+      locations:
+        - name: "us-central1"
+          zones:
+            - name: "us-central1-a"
+              shortName: "a"
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.replicas
+          value: 2
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.labels["server-type"]
+          value: non-root
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--join-servers=spanner-a-rt-0.pod.NAMESPACE,spanner-a-rt-1.pod.NAMESPACE,spanner-a-rt-2.pod.NAMESPACE"
+        documentIndex: 0
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-a-rt
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: spec.replicas
+          value: 3
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - equal:
+          path: metadata.labels["server-type"]
+          value: root
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--root"
+        documentIndex: 1
+        template: spanner_statefulset.yaml
+
+
+  - it: should configure safe-to-evict-local-volumes annotation on pod template
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes"]
+          value: "tmp-volume"
+        template: spanner_statefulset.yaml
+
+

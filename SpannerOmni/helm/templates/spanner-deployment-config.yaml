@@ -12,4 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spanner-deployment-config
+  namespace: {{ include "spanner-omni.namespace" $ }}
+  labels:
+    {{- include "spanner-omni.labels" $ | nindent 4 }}
+data:
+  deployment_config.yaml: |
+    {{- include "spanner-omni.deploymentConfig" $ | nindent 4 }}

@@ -12,4 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+# Sample configuration for deploying Spanner Omni in Single-Server mode (Development / Testing).
+
+global:
+  platform: gke
+
+deployment:
+  singleServer: true
+  listenAddresses: "0.0.0.0,[::]"
+
+monitoring:
+  enabled: true

@@ -1,0 +1,82 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Default namespace for the monitoring stack
+namespace: "monitoring"
+# Default storage class to use across all monitoring components.
+defaultStorageClass: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+prometheus:
+  replicas: 1
+  image: "prom/prometheus:v3.0.1@sha256:565ee86501224ebbb98fc10b332fa54440b100469924003359edf49cbce374bd"
+  retentionSize: "" # Leave empty to default to 80% of prometheus.storage.size
+  retentionTime: "2y"
+  spannerServiceEndpoint: "" # Leave empty to auto-resolve to SpannerOmni service
+  enableCadvisorScrapeJob: false
+  enableKubeletScrapeJob: false
+  enablePushgateway: false
+  # Enables the Prometheus TSDB admin API (/api/v1/admin/tsdb/*), e.g. for
+  # taking snapshots. Disabled by default.
+  enableAdminApi: false
+  pushgateway:
+    image: "prom/pushgateway:v1.6.0"
+    resources:
+      cpu: "100m"
+      memory: "128Mi"
+  resources:
+    cpu: "2"
+    memory: "4Gi"
+  storage:
+    className: ""
+    size: "150Gi"
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+grafana:
+  replicas: 1
+  image: "grafana/grafana:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb"
+  resources:
+    cpu: "2"
+    memory: "4Gi"
+  storage:
+    className: ""
+    size: "10Gi"
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+jaeger:
+  replicas: 1
+  image: "jaegertracing/all-in-one:1.62.0@sha256:836e9b69c88afbedf7683ea7162e179de63b1f981662e83f5ebb68badadc710f"
+  ports:
+    ui: 16686
+    otlpGrpc: 4317
+    otlpHttp: 4318
+  resources:
+    cpu: "2"
+    memory: "4Gi"
+  storage:
+    className: ""
+    size: "10Gi"
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+service:
+  type: ""
+  annotations: {}

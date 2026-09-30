@@ -1,0 +1,259 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Validates the grafana dashboards against the golden list of dashboards.
+
+name: Validate Grafana Dashboards Test
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: read
+
+jobs:
+  validate-dashboards:
+    name: "Validate Dashboards"
+    runs-on: ubuntu-latest
+    steps:
+     - name: Checkout PR branch
+       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+       with:
+         persist-credentials: false
+
+     - name: Install jq
+       run: sudo apt-get install -y jq
+
+     - name: Start Grafana container
+       run: |
+         docker run -d --name grafana -p 3000:3000 grafana/grafana:latest
+         # wait for Grafana to be ready
+         for i in {1..30}; do
+           if curl -s http://localhost:3000/api/health >/dev/null; then
+             echo "Grafana ready!"
+             break
+           fi
+           echo "Waiting for Grafana..."
+           sleep 2
+           done
+
+     - name: Validate dashboards json
+       run: |
+         DASHBOARDS_DIR="SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards"
+         for file in $(find "$DASHBOARDS_DIR" -type f -name '*.json'); do
+           echo "Validating $file"
+           # Wrap the dashboard JSON as grafana expects
+           payload=$(jq -n --slurpfile d "$(realpath "$file")" '{dashboard: ($d[0] | .id = null), overwrite: false}')
+         
+           # Validate dashboard
+           response=$(curl -s -X POST -u admin:admin \
+              -H "Content-Type: application/json" \
+              -d "$payload" \
+              http://localhost:3000/api/dashboards/db)
+           
+           if echo "$response" | jq -e '.status == "success"' > /dev/null; then
+              echo "✅ $file is valid"
+            else
+              echo "❌ $file is INVALID"
+              echo "Response:"
+              echo "$response" | jq .
+              invalid=1
+            fi
+         done
+         
+         if [ "$invalid" -ne 0 ]; then
+            echo "Some dashboards failed validation ❌"
+            exit 1
+          else
+            echo "All dashboards are valid ✅"
+          fi
+        
+
+     - name: Stop Grafana
+       if: always()
+       run: docker rm -f grafana
+
+     - name: Validate dashboards against golden dashboard list
+       run: |
+         set -e
+         GOLDEN=".github/workflows/golden-dashboards.json"
+         DASHBOARDS_DIR="SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards"
+         echo "🔍 Checking consistency between golden list and dashboards/**/*.json..."
+        
+         # Extract golden dashboards
+         jq -r '.dashboards[].file' "$GOLDEN" | sort > /tmp/golden.txt
+        
+         # List all actual dashboard files
+         find $DASHBOARDS_DIR -type f -name "*.json" | sort > /tmp/actual.txt
+        
+         echo "Golden dashboards:"
+         cat /tmp/golden.txt
+         echo
+         echo "Actual dashboards:"
+         cat /tmp/actual.txt
+         echo
+          
+         # Check for missing dashboards (in golden but not in repo)
+         MISSING=$(comm -23 /tmp/golden.txt /tmp/actual.txt || true)
+         if [ -n "$MISSING" ]; then
+           echo "❌ ERROR: Dashboards listed in $GOLDEN but missing in repo:"
+           echo "$MISSING"
+         exit 1
+         fi
+          
+         # Check for extra dashboards (in repo but not in golden)
+         EXTRA=$(comm -13 /tmp/golden.txt /tmp/actual.txt || true)
+         if [ -n "$EXTRA" ]; then
+           echo "❌ ERROR: Dashboards found in repo but not listed in $GOLDEN:"
+           echo "$EXTRA"
+         exit 1
+         fi
+          
+         echo "✅ Golden list and dashboard files match exactly."
+          
+         # ---- Panel validation ----
+         DASHBOARD_COUNT=$(jq '.dashboards | length' $GOLDEN)
+         for i in $(seq 0 $((DASHBOARD_COUNT - 1))); do
+           FILE=$(jq -r ".dashboards[$i].file" $GOLDEN)
+        
+           if [ ! -f "$FILE" ]; then
+             echo "❌ ERROR: Dashboard $FILE missing, skipping panel check."
+             continue
+           fi
+        
+           # Panels from golden list
+           GOLDEN_PANELS=$(jq -r ".dashboards[$i].panels[]" $GOLDEN | sort)
+           # Panels actually in dashboard (ignore rows)
+           CURRENT_PANELS=$(jq -r '.. | .panels? // empty | .[] | .title' "$FILE" | sort)
+        
+           # Compare missing and extra panels
+           MISSING_PANELS=$(comm -23 <(echo "$GOLDEN_PANELS") <(echo "$CURRENT_PANELS") || true)
+           EXTRA_PANELS=$(comm -13 <(echo "$GOLDEN_PANELS") <(echo "$CURRENT_PANELS") || true)
+        
+           if [ -n "$MISSING_PANELS" ] || [ -n "$EXTRA_PANELS" ]; then
+             echo "❌ ERROR: Panels mismatch in $FILE"
+          
+           if [ -n "$MISSING_PANELS" ]; then
+             echo "   Missing panels:"
+             echo "$MISSING_PANELS" | sed 's/^/     - /'
+           fi
+          
+           if [ -n "$EXTRA_PANELS" ]; then
+             echo "   Extra panels:"
+             echo "$EXTRA_PANELS" | sed 's/^/     - /'
+           fi
+          
+           exit 1
+           fi
+           done
+          
+         echo "✅ All dashboards contain exact panels as per golden list."
+
+     - name: Validate alert rules against golden alert rules list
+       run: |
+         python3 - << 'EOF'
+         import json, sys, yaml
+
+         with open(".github/workflows/golden-alert-rules.json") as f:
+             golden = json.load(f)
+             golden.pop("$comment", None)
+         with open(golden["file"]) as f:
+             actual_yaml = yaml.safe_load(f)
+
+         actual = {
+             "file": golden["file"],
+             "groups": [
+                 {
+                     "name": g["name"],
+                     "rules": [
+                         {
+                             "uid": r["uid"],
+                             "title": r["title"],
+                             "expr": r["data"][0]["model"]["expr"],
+                         }
+                         for r in g.get("rules", [])
+                     ],
+                 }
+                 for g in actual_yaml.get("groups", [])
+             ],
+         }
+
+         if actual != golden:
+             print("❌ ERROR: Alert rules in alert_rules.yaml diverged from .github/workflows/golden-alert-rules.json")
+             sys.exit(1)
+         print("✅ Alert rules match .github/workflows/golden-alert-rules.json exactly.")
+         EOF
+
+     - name: Validate job=spanner filter on dashboards and alert rules
+       run: |
+         python3 - << 'EOF'
+         import glob, json, re, sys, yaml
+
+         def has_missing_job_filter(expr, expected_job="spanner"):
+             if "spanner_omni_event_active" in expr:
+                 return False
+             for match in re.finditer(r"[a-zA-Z_:][a-zA-Z0-9_:]*\{([^}]*)\}", expr):
+                 if f'job="{expected_job}"' not in match.group(1):
+                     return True
+             cleaned = re.sub(r"\{([^}]*)\}", lambda m: "{JOB}" if f'job="{expected_job}"' in m.group(1) else "{}", expr)
+             cleaned = re.sub(r"\[[^\]]*\]", "", cleaned)
+             for part in re.split(r"\b(?:and|or|unless)\b|[+\-*/]|==|!=|>=|<=|>|<", cleaned):
+                 part_metrics = re.sub(r"\b(?:by|without|on|ignoring|group_left|group_right)\s*(?:\([^)]*\))?", "", part)
+                 part_metrics = re.sub(r"[a-zA-Z_:][a-zA-Z0-9_:]*\s*\(", "(", part_metrics)
+                 if re.search(r"[a-zA-Z_]", part_metrics) and "{JOB}" not in part:
+                     return True
+             return False
+
+         errors = []
+         for path in sorted(glob.glob("SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/*.json")):
+             with open(path) as f:
+                 data = json.load(f)
+             if any(v.get("name") == "job_filter" for v in data.get("templating", {}).get("list", [])):
+                 errors.append(f"{path}: redundant job_filter variable found in templating.list")
+             expected_job = "spanner-workers" if path.endswith("worker_insights.json") else "spanner"
+             def check_exprs(obj):
+                 if isinstance(obj, dict):
+                     if "expr" in obj and isinstance(obj["expr"], str) and has_missing_job_filter(obj["expr"], expected_job):
+                         errors.append(f"{path}: missing job=\"{expected_job}\" in expr: {obj['expr']}")
+                     for v in obj.values():
+                         check_exprs(v)
+                 elif isinstance(obj, list):
+                     for item in obj:
+                         check_exprs(item)
+             check_exprs(data)
+
+         alert_file = "SpannerOmni/helm/charts/monitoring/grafana/provisioning/alerting/alert_rules.yaml"
+         with open(alert_file) as f:
+             alerts = yaml.safe_load(f)
+         for group in alerts.get("groups", []):
+             for rule in group.get("rules", []):
+                 for d in rule.get("data", []):
+                     expr = d.get("model", {}).get("expr", "")
+                     if expr and has_missing_job_filter(expr):
+                         errors.append(f"{alert_file} [{rule.get('title')}]: missing job=\"spanner\" in expr: {expr}")
+
+         if errors:
+             for err in errors:
+                 print(f"❌ ERROR: {err}")
+             sys.exit(1)
+         print("✅ All expressions across dashboards and alert_rules.yaml contain job=\"spanner\".")
+         EOF

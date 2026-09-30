@@ -12,4 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+defaultStorageClass: premium-rwo
+
+service:
+  annotations:
+    networking.gke.io/load-balancer-type: "Internal"
+    networking.gke.io/internal-load-balancer-allow-global-access: "true"

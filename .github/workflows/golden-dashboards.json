@@ -1,0 +1,233 @@
+{
+  "$comment": "Copyright 2026 Google LLC. Licensed under the Apache License, Version 2.0 (the \"License\"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.",
+  "dashboards": [
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/spanner_filesystem.json",
+      "panels": [
+        "Operations Per Second",
+        "Local/Remote Operations Per Second",
+        "Operation Errors Per Second",
+        "File Operation Graphs",
+        "Local Operations P50 Latency",
+        "Remote Operations P50 Latency",
+        "Local Operations P90 Latency",
+        "Remote Operations P90 Latency",
+        "Local Operations P99 Latency",
+        "Remote Operations P99 Latency",
+        "Latency Graphs",
+        "Local Read/Write Throughput",
+        "Remote Read/Write Throughput",
+        "P50 Bytes Per Local Operation",
+        "P50 Bytes Per Remote Operation",
+        "P90 Bytes Per Local Operation",
+        "P90 Bytes Per Remote Operation",
+        "Throughput Graphs",
+        "Filesystem Usage By Zone",
+        "Top 10 Servers By Filesystem Usage",
+        "Filesystem Statistics"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/system_insights.json",
+      "panels": [
+        "CPU Utilization Overview",
+        "CPU utilization by user/system",
+        "CPU Utilization By Operation Type",
+        "CPU Utilization By Operation Type - High Priority",
+        "CPU Utilization By Operation Type - Medium Priority",
+        "CPU Utilization By Operation Type - Low Priority",
+        "Request Latency - P50",
+        "Request Latency - P90",
+        "Request Latency - P99",
+        "Request Latency By Method - P50",
+        "Request Latency By Method - P90",
+        "Request Latency By Method - P99",
+        "Transaction Latency - P50",
+        "Transaction Latency - P90",
+        "Transaction Latency - P99",
+        "Throughput",
+        "Throughput By Method",
+        "Operations Per Second",
+        "Operations Per Second By Method",
+        "Storage Utilization By Database",
+        "Aborted Transactions Rate",
+        "Lock Wait Time",
+        "Transaction Participants",
+        "Schema Object Count"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/compactions.json",
+      "panels": [
+        "Compactions Input Size (Mean) Per Compaction Type",
+        "Compactions Input Size (Mean) Per Server",
+        "Compactions Input Size (P50 Estimate) Per Server",
+        "Compactions Input Size(P50 Estimate) Per Compaction Type",
+        "Compactions Input Size(P95 Estimate) Per Compaction Type",
+        "Compactions Input Size(P95 Estimate) Per Server",
+        "Compactions Input Size(P99 Estimate) Per Compaction Type",
+        "Compactions Input Size(P99 Estimate) Per Server",
+        "Compactions Input/Output Bytes",
+        "Compactions Output Bytes Rate Per Compaction Type",
+        "Compactions Output Bytes Rate Per Server",
+        "Failed Compactions Per Compaction Type (Last 1h)",
+        "Failed Compactions Per Server (Last 1h)",
+        "Major Compaction Lag (P50 Estimate) Per Server",
+        "Major Compaction Lag (P90 Estimate) Per Server",
+        "Major Compaction Lag (P99 Estimate) Per Server",
+        "Major Compaction Lag",
+        "Successful Compactions Per Compaction Type (Last 1h)",
+        "Successful Compactions Per Server (Last 1h)",
+        "Successful/Failed Compactions"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/tablets.json",
+      "panels": [
+        "Total Tablet Count",
+        "Tablet Count By Zone",
+        "Tablet Count By Server",
+        "Leader Count By Zone",
+        "Leader Count By Server",
+        "Unassigned Tablets Per Zone",
+        "Tablet Loads By Zone",
+        "Tablet Unloads By Zone By Reason",
+        "Max Tablet Load For Each Server",
+        "Hot Tablets Count",
+        "Tablet Load Distribution ",
+        "Tablets In Pushback Per Type Per Level",
+        "Tablets In Pushback Per Server",
+        "Tablets Stack Depth Distribution",
+        "Tablets Stack Depth (P50 Estimate) Per Locality Group",
+        "Tablets Stack Depth (P90 Estimate) Per Locality Group",
+        "Tablets Stack Depth (P99 Estimate) Per Locality Group",
+        "Values Per Server",
+        "Values Per Database",
+        "Deletes Per Server",
+        "Deletes Per Database"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/splits_merges_moves.json",
+      "panels": [
+        "Split size Distribution",
+        "Group Size Distribution",
+        "Group Size In Memory Distribution",
+        "Group Size P50 By Zone ",
+        "Group Size P90 By Zone ",
+        "Group Size P99 By Zone ",
+        "Group Size P100 By Zone ",
+        "Number of successful internal data moves",
+        "Number of failed internal data moves",
+        "Unsplittable errors by reason and type",
+        "Peak Split CPU Usage Score"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/truetime.json",
+      "panels": [
+        "Clock SLA Violations by Server",
+        "P99 TrueTime Drift",
+        "P99 TrueTime Interval Uncertainty",
+        "TrueTime Availability",
+        "VM Migration Count",
+        "Whether this VM is violating Clock SLA"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/deployment_insights.json",
+      "panels": [
+        "CPU utilization",
+        "Server CPU utilization",
+        "Process CPU utilization",
+        "Memory utilization",
+        "Server Memory utilization",
+        "Process Resident Memory Size",
+        "Process Virtual Memory Size",
+        "Server Uptime",
+        "Server Memory Breakdown",
+        "Network Sent Bytes",
+        "Network Received Bytes",
+        "Top 10 Servers By Network Sent Bytes",
+        "Top 10 Servers By Network Received Bytes",
+        "Server Count By Version"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/grpc.json",
+      "panels": [
+        "Client Canonical Status Count Per Method",
+        "Client Completed RPCs Per Method",
+        "Client Received Throughput Per Process",
+        "Client Received Throughput Per Method",
+        "Client Sent Throughput Per Method",
+        "Client Sent Throughput Per Process",
+        "P50 Client Roundtrip Latency Per Method",
+        "P90 Client Roundtrip Latency Per Method",
+        "P99 Client Roundtrip Latency Per Method",
+        "Client Side Metrics",
+        "Server Active Channels",
+        "Server Canonical Status Count Per Method",
+        "Server Completed RPCs Per Method",
+        "P50 RPC Latency Per Method",
+        "P90 RPC Latency Per Method",
+        "P99 RPC Latency Per Method",
+        "Server Received Throughput Per Method",
+        "Server Received Throughput Per Process",
+        "Server Sent Throughput Per Method",
+        "Server Sent Throughput Per Process",
+        "Server Side Metrics"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/overview.json",
+      "panels": [
+        "Active Alerts & System Concerns",
+        "Compute Capacity (vCPU)",
+        "Memory Capacity",
+        "Storage Capacity",
+        "Node Status",
+        "Compute Utilization",
+        "Memory Utilization",
+        "Storage Utilization",
+        "Storage Used Per vCPU",
+        "Healthy Servers",
+        "Unhealthy Servers"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/shared_log.json",
+      "panels": [
+        "Shared Log Write Rate",
+        "Shared Log Write Rate Per Database",
+        "Shared Log Bytes Written",
+        "Shared Log Bytes Written Per Database",
+        "Shared Log Batches Write Rate",
+        "Shared Log Batch Write Latency Distribution",
+        "Shared Log Batch Entries Count Distribution",
+        "LogSort Request Rate",
+        "LogSort Sorting Error Rate",
+        "In Progress Shared Log Readers"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/backups_and_restores.json",
+      "panels": [
+        "Backups",
+        "Backup Creation Duration (log scale)",
+        "Count of Backup Creations per execution state",
+        "Ratio of Backup Creations within deadline",
+        "Restores",
+        "Restore Duration (log scale)",
+        "Count of Restores per execution state"
+      ]
+    },
+    {
+      "file" : "SpannerOmni/helm/charts/monitoring/grafana/provisioning/dashboards/worker_insights.json",
+      "panels": [
+        "Worker CPU utilization",
+        "Worker Memory utilization"
+      ]
+    }
+  ]
+}

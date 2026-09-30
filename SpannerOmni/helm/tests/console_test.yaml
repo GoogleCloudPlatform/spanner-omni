@@ -1,0 +1,244 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Spanner UI Tests
+templates:
+  - console.yaml
+
+tests:
+  - it: should not render UI components when console.enabled is false
+    set:
+      console:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render UI Deployment and Service when console.enabled is true
+    set:
+      console:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: Deployment
+        documentIndex: 0
+      - isKind:
+          of: Service
+        documentIndex: 1
+
+  - it: should implicitly enable UI when console.enabled is omitted and insecureMode is true
+    set:
+      global:
+        insecureMode: true
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should implicitly disable UI when console.enabled is omitted and insecureMode is false
+    set:
+      global:
+        insecureMode: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should implicitly enable UI when console.enabled is null and insecureMode is true
+    set:
+      console:
+        enabled: null
+      global:
+        insecureMode: true
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should implicitly disable UI when console.enabled is null and insecureMode is false
+    set:
+      console:
+        enabled: null
+      global:
+        insecureMode: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should override UI replicas explicitly when console.replicas is provided
+    set:
+      console:
+        enabled: true
+        replicas: 5
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 5
+        documentIndex: 0
+
+  - it: should set UI replicas to 1 when singleServer mode is active
+    set:
+      console:
+        enabled: true
+        replicas: null
+      deployment:
+        singleServer: true
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+        documentIndex: 0
+
+  - it: should set UI replicas to 2 when singleServer is false and single zone provided
+    set:
+      console:
+        enabled: true
+        replicas: null
+      deployment:
+        singleServer: false
+      locations:
+        - name: us-central1
+          zones:
+            - name: us-central1-a
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+        documentIndex: 0
+
+  - it: should set UI replicas to exactly number of zones when singleServer is false and multiple zones provided
+    set:
+      console:
+        enabled: true
+        replicas: null
+      deployment:
+        singleServer: false
+      locations:
+        - name: us-central1
+          zones:
+            - name: us-central1-a
+            - name: us-central1-b
+            - name: us-central1-c
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+        documentIndex: 0
+
+  - it: should render UI image with digest format when digest provided
+    set:
+      console:
+        enabled: true
+        image:
+          repository: spanner-omni-ui
+          tag: latest
+          digest: sha256:abcd1234abcd1234
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "spanner-omni-ui@sha256:abcd1234abcd1234"
+        documentIndex: 0
+
+  - it: should render UI image with tag format when digest omitted
+    set:
+      console:
+        enabled: true
+        image:
+          repository: spanner-omni-ui
+          tag: 2026.ui.tag
+          digest: ""
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "spanner-omni-ui:2026.ui.tag"
+        documentIndex: 0
+
+  - it: should automatically infer UI repository from parent core repository
+    set:
+      console:
+        enabled: true
+        image:
+          repository: ""
+          tag: 2026.derived.tag
+      image:
+        repository: base-spanner-server
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "base-spanner-ui:2026.derived.tag"
+        documentIndex: 0
+
+  - it: should fall back to parent core tag when UI tag is empty
+    set:
+      console:
+        enabled: true
+        image:
+          repository: spanner-omni-ui
+          tag: ""
+      image:
+        tag: 2026.core.fallback
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "spanner-omni-ui:2026.core.fallback"
+        documentIndex: 0
+
+  - it: should compute default UI console port correctly (15000 + 26)
+    set:
+      console:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 15026
+        documentIndex: 0
+      - equal:
+          path: spec.ports[0].port
+          value: 15026
+        documentIndex: 1
+
+  - it: should compute custom UI console port correctly when basePort modified
+    set:
+      console:
+        enabled: true
+      deployment:
+        basePort: 20000
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 20026
+        documentIndex: 0
+      - equal:
+          path: spec.ports[0].port
+          value: 20026
+        documentIndex: 1
+
+  - it: should override UI console port in service when console.service.port is provided
+    set:
+      console:
+        enabled: true
+        service:
+          port: 80
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+        documentIndex: 1
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 15026
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 15026
+        documentIndex: 0

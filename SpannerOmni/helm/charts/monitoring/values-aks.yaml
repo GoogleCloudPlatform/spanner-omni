@@ -12,4 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+defaultStorageClass: azure-premium-lrs
+
+service:
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    service.beta.kubernetes.io/azure-load-balancer-sku: "Standard"

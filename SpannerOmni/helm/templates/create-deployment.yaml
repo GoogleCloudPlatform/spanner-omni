@@ -1,0 +1,113 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Create deployment job for Spanner deployment. This runs only during
+# install and runs only on the cluster of the last location. This is skipped for
+# single server deployments.
+
+{{- $platformValues := include "spanner-omni.PlatformValues" $ | fromYaml -}}
+{{- if and $.Release.IsInstall (not $.Values.deployment.singleServer) }}
+{{- $locationsLength := len $platformValues.locations }}
+{{- $lastLocIndex := sub $locationsLength 1 }}
+{{- $lastLocName := (index $platformValues.locations $lastLocIndex).name }}
+{{- $currentLocName := (include "spanner-omni.currentLocation" $ | fromYaml).name }}
+{{- if eq $currentLocName $lastLocName }}
+{{- $adminPasswordSecret := $.Values.deployment.adminPasswordSecret }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  namespace: {{ include "spanner-omni.namespace" $ }}
+  name: spanner-bootstrap-job
+  labels:
+    {{- include "spanner-omni.labels" $ | nindent 4 }}
+  annotations:
+    # This annotation ensures that the job is not deleted when the release is upgraded or uninstalled.
+    "helm.sh/resource-policy": keep
+    app.kubernetes.io/component: bootstrap
+spec:
+  backoffLimit: 100
+  template:
+    metadata:
+      namespace: {{ include "spanner-omni.namespace" $ }}
+      labels:
+        {{- include "spanner-omni.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      {{- if $.Values.image.pullSecret }}
+      imagePullSecrets:
+      - name: {{ $.Values.image.pullSecret }}
+      {{- end }}
+      restartPolicy: OnFailure
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: spanner-bootstrap
+          image: {{ include "spanner-omni.image" $ | quote }}
+          {{- if $.Values.image.pullPolicy }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          {{- end }}
+          resources:
+            {{- toYaml $.Values.jobs.resources | nindent 12 }}
+          command:
+            - /google/spanner/bin/spanner
+          args:
+            - deployment
+            - create
+            - --base-dir=/spanner
+            - --config-file=/etc/spanner-config/deployment_config.yaml
+            - --server-health-check-timeout=60s
+            {{- if $adminPasswordSecret }}
+            - --admin-password-file=/etc/admin-password/password
+            {{- end }}
+          volumeMounts:
+            - name: deployment-config
+              mountPath: /etc/spanner-config
+            - name: tls-certs
+              mountPath: "/spanner/tls"
+              readOnly: true
+            - name: spanner-data
+              mountPath: /spanner
+            {{- if $adminPasswordSecret }}
+            - name: admin-password
+              mountPath: /etc/admin-password
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: deployment-config
+          configMap:
+            name: spanner-deployment-config
+        - name: tls-certs
+          secret:
+            secretName: tls-certs
+            optional: true
+            defaultMode: 256
+        - name: spanner-data
+          emptyDir: {}
+        {{- if $adminPasswordSecret }}
+        - name: admin-password
+          secret:
+            secretName: {{ $adminPasswordSecret }}
+            defaultMode: 384
+            items:
+              - key: password
+                path: password
+        {{- end }}
+{{- end }}
+{{- end }}

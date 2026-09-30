@@ -12,4 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+{{- if .Values.licenseKey }}
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: spanner-license-key
+  namespace: {{ include "spanner-omni.namespace" . }}
+  labels:
+    {{- include "spanner-omni.labels" . | nindent 4 }}
+stringData:
+  LICENSE_KEY: {{ .Values.licenseKey | quote }}
+{{- end }}

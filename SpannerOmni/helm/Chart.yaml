@@ -12,4 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-* @krishnamoorthy-r @srinivasmasna @adityatulasi-google
+apiVersion: v2
+name: spanner-omni
+description: A Helm chart for deploying Spanner Omni.
+type: application
+version: 1.0.0
+appVersion: "2026.r4-lts"
+
+dependencies:
+  - name: monitoring
+    version: "1.0.0"
+    repository: "file://charts/monitoring"
+    condition: monitoring.enabled
