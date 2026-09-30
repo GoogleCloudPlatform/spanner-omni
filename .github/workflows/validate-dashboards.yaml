@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -175,6 +175,7 @@ jobs:
 
          with open(".github/workflows/golden-alert-rules.json") as f:
              golden = json.load(f)
+             golden.pop("$comment", None)
          with open(golden["file"]) as f:
              actual_yaml = yaml.safe_load(f)
 

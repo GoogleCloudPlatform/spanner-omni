@@ -57,7 +57,7 @@ helm upgrade --install spanner-omni \
   --create-namespace
 ```
 
-- `deployment.listenAddresses`: A comma-separated list of IP addresses to listen on in single-server mode (`deployment.singleServer=true`). If not set, it uses the backend default (`localhost`). [`values-single-server.yaml`](SpannerOmni/samples/helm/values-single-server.yaml) sets `0.0.0.0,[::]` to allow cluster and external network access (e.g., for Kubernetes probes and external clients).
+- `deployment.listenAddresses`: A comma-separated list of IP addresses to listen on in single-server mode (`deployment.singleServer=true`). If not set, it uses the backend default (`localhost`). [`values-single-server.yaml`](SpannerOmni/samples/helm/values-single-server.yaml) sets `0.0.0.0,[::]` to allow cluster and external network access (e.g., for Kubernetes probes and external clients). *(Note: `--listen-addresses` requires Spanner Omni server image `2026.r4-lts` or later; if testing with an earlier image such as `2026.r3-beta.2`, append `--set deployment.listenAddresses=""`.)*
 
 ### 2. Deploying to a Single Zone
 
@@ -90,6 +90,7 @@ kubectl create namespace monitoring
 helm upgrade --install spanner-omni \
   oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
   -f SpannerOmni/samples/helm/values-regional.yaml \
+  --set-json 'extraEnvVars=[{"name":"SPANNER_ROOT_SERVERS_COUNT","value":"1"}]' \
   --set monitoring.enabled=true \
   --namespace spanner-ns \
   --create-namespace
@@ -103,7 +104,8 @@ helm upgrade --install spanner-omni \
   --create-namespace
 ```
 
-Refer to [`SpannerOmni/helm/values.yaml`](SpannerOmni/helm/values.yaml) and [`SpannerOmni/helm/values-gke.yaml`](SpannerOmni/helm/values-gke.yaml) for additional configuration options, including zone names and locations.
+> [!NOTE]
+> Ensure the zone names in `locations[].zones[].name` match your cluster's node zones (`topology.kubernetes.io/zone` label). For example, [`values-regional.yaml`](SpannerOmni/samples/helm/values-regional.yaml) defaults to `us-east1-{b,c,d}`, while [`values-gke.yaml`](SpannerOmni/helm/values-gke.yaml) (used by [`values-scaleout.yaml`](SpannerOmni/samples/helm/values-scaleout.yaml)) defaults to `us-west1-{a,b,c}`. Refer to [`SpannerOmni/helm/values.yaml`](SpannerOmni/helm/values.yaml) and [`SpannerOmni/helm/values-gke.yaml`](SpannerOmni/helm/values-gke.yaml) for additional configuration options, including storage classes (`dataStorageClass` / `logsStorageClass`, e.g. `hyperdisk-balanced-rwo` on GKE N4 nodes).
 
 ### 4. Deploying Multi-Cluster / Multi-Region & Multi-Cloud Spanner Omni
 
@@ -174,6 +176,9 @@ helm upgrade --install spanner-omni \
   --set currentLocation=us-central1 \
   --create-namespace \
   --kube-context ctx-gke-usc1
+
+# Configure cross-cluster DNS resolution between EKS and GKE
+./SpannerOmni/scripts/dns-setup.sh -n spanner-ns-use1,spanner-ns-usc1 ctx-eks-use1 ctx-gke-usc1
 ```
 
 ### 5. Verifying the Deployment & Connecting
@@ -183,17 +188,28 @@ helm upgrade --install spanner-omni \
    kubectl get pods -n spanner-ns -w
    ```
 2. **Monitor the Bootstrap Job (Multi-Server Deployments)**:
-   In single-zone, multi-zone, and multi-cluster deployments, a background Kubernetes Job initializes the Spanner topology once all server pods are reachable:
+   In single-zone, multi-zone, and multi-cluster deployments, a background Kubernetes Job (`spanner-bootstrap-job`) initializes the Spanner topology once all server pods are reachable (in multi-cluster deployments, check the final location's namespace, e.g., `spanner-ns-usw3` or `spanner-ns-usc1`):
    ```bash
-   kubectl get jobs -n spanner-ns -l app.kubernetes.io/component=bootstrap -w
+   kubectl get job spanner-bootstrap-job -n spanner-ns -w
    kubectl logs -n spanner-ns -l app.kubernetes.io/component=bootstrap -f
    ```
-3. **Retrieve the Spanner Service Endpoint**:
-   Once the bootstrap job completes (or the pod is `Ready` in single-server mode), inspect the `spanner` Kubernetes Service for the connection endpoint:
+3. **Verify Database Creation & SQL Execution (`spanner` CLI)**:
+   Once the bootstrap job completes (or the pod is `1/1 Running` in single-server mode), verify the cluster using the bundled `spanner` CLI inside the root server pod (`spanner-a-0` for single-server or regional single-server-per-zone topologies; `spanner-a-rt-0` for scaleout, multi-region, and multi-cloud topologies with dedicated root servers):
+   ```bash
+   # Single-Server / Regional (1 server per zone): use pod spanner-a-0
+   # Scaleout / Multi-Region / Multi-Cloud: use pod spanner-a-rt-0
+   POD=spanner-a-0
+
+   kubectl exec -n spanner-ns $POD -c spanner -- /google/spanner/bin/spanner databases list
+   kubectl exec -n spanner-ns $POD -c spanner -- /google/spanner/bin/spanner databases create testdb
+   kubectl exec -n spanner-ns $POD -c spanner -- /google/spanner/bin/spanner databases execute-sql testdb --sql="SELECT 1 AS ok"
+   ```
+4. **Retrieve the Spanner Service Endpoint**:
+   Inspect the `spanner` Kubernetes Service for the client connection endpoint:
    ```bash
    kubectl get service spanner -n spanner-ns
    ```
-4. **Access the Bundled Observability Dashboards (if enabled)**:
+5. **Access the Bundled Observability Dashboards (if enabled)**:
    Port-forward the Grafana service in the `monitoring` namespace to view pre-provisioned Spanner Omni dashboards:
    ```bash
    kubectl port-forward svc/grafana -n monitoring 3000:3000
