@@ -1,0 +1,227 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Values Schema for Monitoring Subchart",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "insecureMode": {
+          "type": "boolean"
+        }
+      },
+      "required": ["insecureMode"]
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "prometheus": {
+      "type": "object",
+      "properties": {
+        "nodeSelector": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "type": "string"
+        },
+        "retentionSize": {
+          "type": "string"
+        },
+        "retentionTime": {
+          "type": "string"
+        },
+        "spannerServiceEndpoint": {
+          "type": "string"
+        },
+        "enableCadvisorScrapeJob": {
+          "type": "boolean"
+        },
+        "enableKubeletScrapeJob": {
+          "type": "boolean"
+        },
+        "enableAdminApi": {
+          "type": "boolean"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["string", "integer", "number"]
+            },
+            "memory": {
+              "type": "string"
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "className": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string",
+              "pattern": "^[0-9]+([TGMEK]i?|B|m)$"
+            }
+          },
+          "required": ["className", "size"]
+        }
+      },
+      "required": ["replicas", "image", "resources", "storage"]
+    },
+    "grafana": {
+      "type": "object",
+      "properties": {
+        "nodeSelector": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["string", "integer", "number"]
+            },
+            "memory": {
+              "type": "string"
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "className": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string",
+              "pattern": "^[0-9]+([TGMEK]i?|B|m)$"
+            }
+          },
+          "required": ["className", "size"]
+        }
+      },
+      "required": ["replicas", "image", "resources", "storage"]
+    },
+    "jaeger": {
+      "type": "object",
+      "properties": {
+        "nodeSelector": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "type": "string"
+        },
+        "ports": {
+          "type": "object",
+          "properties": {
+            "ui": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535
+            },
+            "otlpGrpc": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535
+            },
+            "otlpHttp": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535
+            }
+          },
+          "required": ["ui", "otlpGrpc", "otlpHttp"]
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["string", "integer", "number"]
+            },
+            "memory": {
+              "type": "string"
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "className": {
+              "type": "string"
+            },
+            "size": {
+              "type": "string",
+              "pattern": "^[0-9]+([TGMEK]i?|B|m)$"
+            }
+          },
+          "required": ["className", "size"]
+        }
+      },
+      "required": ["replicas", "image", "ports", "resources", "storage"]
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["", "ClusterIP", "NodePort", "LoadBalancer"]
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "global",
+    "namespace",
+    "prometheus",
+    "grafana",
+    "jaeger"
+  ]
+}

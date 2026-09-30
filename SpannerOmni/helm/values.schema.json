@@ -1,0 +1,247 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Values Schema for Spanner Omni Chart",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "insecureMode": {
+          "type": "boolean"
+        }
+      },
+      "required": ["insecureMode"]
+    },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "namespaceOverride": { "type": "string" },
+    "licenseKey": { "type": "string" },
+    "currentLocation": { "type": "string" },
+    "platform": {
+      "type": "string",
+      "enum": ["", "gke", "eks", "aks", "vsphere"]
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "nodePort": {
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 32767
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string" },
+        "pullPolicy": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullSecret": { "type": "string" }
+      }
+    },
+    "rollout": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": "string" },
+            "pullPolicy": { "type": "string" },
+            "pullSecret": { "type": "string" }
+          }
+        },
+        "waitSeconds": { "type": "integer" },
+        "staggered": { "type": "boolean" }
+      }
+    },
+    "console": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": ["boolean", "null"] },
+        "replicas": { "type": ["integer", "null"] },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": "string" },
+            "digest": { "type": "string" },
+            "pullPolicy": { "type": "string" }
+          }
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "nodePort": { "type": "integer" },
+            "port": { "type": ["integer", "null"] }
+          }
+        },
+        "nodeSelector": { "type": "object" },
+        "affinity": { "type": "object" },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": { "type": "string" },
+                "memory": { "type": "string" }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": { "type": "string" },
+                "memory": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "required": ["image"]
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "cpu": { "type": ["integer", "string"] },
+        "memory": { "type": "string" }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "className": { "type": "string" },
+            "size": { "type": "string" }
+          }
+        },
+        "logs": {
+          "type": "object",
+          "properties": {
+            "className": { "type": "string" },
+            "size": { "type": "string" }
+          }
+        }
+      }
+    },
+    "storageClasses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "provisioner": { "type": "string" },
+          "volumeBindingMode": { "type": "string" },
+          "allowVolumeExpansion": { "type": "boolean" },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "required": ["name", "provisioner"]
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "singleServer": { "type": "boolean" },
+        "listenAddresses": { "type": "string" },
+        "featureFlagsConfigMap": { "type": "string" },
+        "spannerConfig": { "type": "string" },
+        "replicasPerZone": { "type": "integer" },
+        "rootServersPerZone": { "type": "integer" },
+        "rootServers": {
+          "type": ["object", "null"],
+          "properties": {
+            "nodeSelector": { "type": "object" },
+            "tolerations": { "type": "array" },
+            "affinity": { "type": "object" },
+            "resources": { "type": "object" },
+            "storage": { "type": "object" }
+          }
+        },
+        "enableClientCertificateAuthentication": { "type": "boolean" },
+        "enablePasswordAuthentication": { "type": "boolean" },
+        "adminPasswordSecret": { "type": "string" },
+        "traceExporterEndpoint": { "type": "string" },
+        "useSingleTimeServer": { "type": "boolean" },
+        "multiCluster": { "type": "boolean" },
+        "basePort": { 
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65523
+        }
+      },
+      "required": ["basePort", "enableClientCertificateAuthentication", "enablePasswordAuthentication"]
+    },
+    "locations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "namespace": { "type": "string" },
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "shortName": { "type": "string" },
+                "replicas": { "type": "integer" },
+                "rootServers": { "type": "integer" },
+                "singleServer": { "type": "boolean" },
+                "replicaType": {
+                  "type": "string",
+                  "enum": ["READ_WRITE", "WITNESS", "READ_ONLY"]
+                }
+              },
+              "required": ["name"]
+            }
+          }
+        },
+        "required": ["name"]
+      }
+    },
+    "workers": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "joinServers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "port": { "type": "integer" },
+        "replicas": { "type": "integer" },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": ["integer", "string"] },
+            "memory": { "type": "string" }
+          }
+        },
+        "nodeLabelKey": { "type": "string" },
+        "nodeLabelValue": { "type": "string" },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "size": { "type": "string" },
+            "storageClassName": { "type": "string" }
+          }
+        },
+        "pdbMaxUnavailable": { "type": "integer" },
+        "affinity": { "type": "object" }
+      }
+    }
+  },
+  "required": ["console"]
+}

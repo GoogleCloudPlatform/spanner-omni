@@ -1,0 +1,78 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+{{- $platformValues := include "spanner-omni.PlatformValues" . | fromYaml -}}
+
+# Service for exposing Spanner frontend address to the clients. This creates internal load balancer.
+# The clients has to run in the same VPC. It is recommedned cluster is enabled with L4 GKE subset.
+apiVersion: v1
+kind: Service
+metadata:
+  name: spanner
+  namespace: {{ include "spanner-omni.namespace" . }}
+  labels:
+    {{- include "spanner-omni.labels" . | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "{{ include "spanner-omni.uiPort" . }}"
+    prometheus.io/path: "/metrics"
+    {{- if $platformValues.serviceAnnotations }}
+    {{- toYaml $platformValues.serviceAnnotations | nindent 4 }}
+    {{- end }}
+spec:
+  {{ $serviceType := $.Values.service.type }}
+  {{ if not $serviceType }}
+    {{ if $.Values.deployment.singleServer }}
+      {{ $serviceType = "NodePort" }}
+    {{ else }}
+      {{ $serviceType = "LoadBalancer" }}
+    {{ end }}
+  {{ end }}
+  type: {{ $serviceType }}
+  {{- if or (eq $serviceType "LoadBalancer") (eq $serviceType "NodePort") }}
+  # Local traffic policy is required to prreserve the client IP/hostname which is required for
+  # mutual TLS to work.
+  externalTrafficPolicy: Local
+  {{- end }}
+  selector:
+    {{- include "spanner-omni.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: spanner
+  ports:
+  - name: spanner
+    protocol: TCP
+    port: {{ $.Values.deployment.basePort }}
+    targetPort: {{ $.Values.deployment.basePort }}
+    {{- if eq $serviceType "NodePort" }}
+    nodePort: {{ $.Values.service.nodePort | default 30000 }}
+    {{- end }}
+  - name: spanner-ui
+    protocol: TCP
+    port: {{ include "spanner-omni.uiPort" . }}
+    targetPort: {{ include "spanner-omni.uiPort" . }}
+---
+# Headless service (no LB or proxy) definition. This allows the pods to connect with each other.
+# Pods would resolve with the short dns <pod-name>.pod (ex: span-0.pod)
+# https://kubernetes.io/docs/concepts/services-networking/service/#headless-services
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod
+  namespace: {{ include "spanner-omni.namespace" . }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  # POD needs to connect with each other in cluster for being ready. By default, DNS A records are created only after the POD is ready but since our servers need DNS resolution part of startup, we need to create A records even before the pod is ready.
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "spanner-omni.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: spanner

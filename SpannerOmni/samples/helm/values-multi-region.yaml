@@ -1,0 +1,43 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Sample configuration for a multi-region deployment across 3 clusters (one per location).
+
+global:
+  platform: gke
+
+deployment:
+  multiCluster: true
+
+locations:
+  - name: us-west1
+    namespace: spanner-ns-usw1
+    zones:
+      - name: "us-west1-a"
+        shortName: "a"
+      - name: "us-west1-b"
+        shortName: "b"
+  - name: us-west2
+    namespace: spanner-ns-usw2
+    zones:
+      - name: "us-west2-a"
+        shortName: "a"
+      - name: "us-west2-b"
+        shortName: "b"
+  - name: us-west3
+    namespace: spanner-ns-usw3
+    zones:
+      - name: "us-west3-a"
+        shortName: "a"
+        replicaType: WITNESS

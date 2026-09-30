@@ -1,0 +1,573 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Worker StatefulSet Tests
+templates:
+  - worker-statefulset.yaml
+
+tests:
+  - it: should not render anything when workers.enabled is false
+    set:
+      workers:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: worker-statefulset.yaml
+
+  - it: should configure only required environment variables (NAMESPACE, POD_NAME)
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: NAMESPACE
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].env[0].valueFrom.fieldRef.fieldPath
+          value: metadata.namespace
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].env[1].name
+          value: POD_NAME
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].env[1].valueFrom.fieldRef.fieldPath
+          value: metadata.name
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - isNull:
+          path: spec.template.spec.containers[0].env[2]
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should render Service and StatefulSet when workers.enabled is true
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: worker-statefulset.yaml
+      - isKind:
+          of: Service
+        documentIndex: 0
+        template: worker-statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: worker-pod
+        documentIndex: 0
+        template: worker-statefulset.yaml
+      - isKind:
+          of: StatefulSet
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: spanner-worker
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should render correct defaults when enabled with no overrides
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+    asserts:
+      # Service Defaults
+      - equal:
+          path: spec.clusterIP
+          value: None
+        documentIndex: 0
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.publishNotReadyAddresses
+          value: true
+        documentIndex: 0
+        template: worker-statefulset.yaml
+      # StatefulSet Defaults
+      - equal:
+          path: spec.serviceName
+          value: worker-pod
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.replicas
+          value: 1
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.metadata.annotations["cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes"]
+          value: "tmp-volume"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "6"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: "24Gi"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: "6"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: "24Gi"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: "spanner-role"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: "workers"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey
+          value: "kubernetes.io/hostname"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].labelSelector.matchLabels["app.kubernetes.io/component"]
+          value: "spanner-worker"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: "spanner-role"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.tolerations[0].value
+          value: "workers"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: "20Gi"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - isNull:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--address=$(POD_NAME).worker-pod.$(NAMESPACE):15000"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--location=us"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--join-servers=spanner-a-0.pod.NAMESPACE:15000,spanner-b-rt-0.pod.NAMESPACE:15000,spanner-b-rt-1.pod.NAMESPACE:15000,spanner-b-rt-2.pod.NAMESPACE:15000,spanner-c-rt-0.pod.NAMESPACE:15000,spanner-c-rt-1.pod.NAMESPACE:15000,spanner-c-rt-2.pod.NAMESPACE:15000"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "workers"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "start"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should configure join-servers with -rt suffix for dedicated root zones
+    set:
+      currentLocation: us-east
+      locations:
+        - name: us-east
+          zones:
+            - name: us-east-1a
+              shortName: a
+              rootServers: 2
+            - name: us-east-1b
+              shortName: b
+              rootServers: 1
+      workers:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--join-servers=spanner-a-rt-0.pod.NAMESPACE:15000,spanner-a-rt-1.pod.NAMESPACE:15000,spanner-b-rt-0.pod.NAMESPACE:15000"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should fallback location and join-servers correctly when currentLocation is empty
+    set:
+      currentLocation: ""
+      locations:
+        - name: custom-loc
+          zones:
+            - name: custom-z1
+              shortName: z1
+              rootServers: 1
+      workers:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels.location
+          value: custom-loc
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--location=custom-loc"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--join-servers=spanner-z1-rt-0.pod.NAMESPACE:15000"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should configure join-servers without -rt suffix for singleServer zone in mixed deployment
+    set:
+      currentLocation: us-east
+      locations:
+        - name: us-east
+          zones:
+            - name: us-east-1a
+              shortName: a
+              singleServer: true
+              rootServers: 1
+            - name: us-east-1b
+              shortName: b
+              rootServers: 2
+      workers:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--join-servers=spanner-a-0.pod.NAMESPACE:15000,spanner-b-rt-0.pod.NAMESPACE:15000,spanner-b-rt-1.pod.NAMESPACE:15000"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should allow overriding join-servers via workers.joinServers
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+        joinServers:
+          - "custom-root-0:15000"
+          - "custom-root-1:15000"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--join-servers=custom-root-0:15000,custom-root-1:15000"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should configure replica count overrides
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+        replicas: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should configure custom worker port
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+        port: 25000
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--address=$(POD_NAME).worker-pod.$(NAMESPACE):25000"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should inherit deployment.basePort when worker port is not set
+    set:
+      currentLocation: us
+      deployment:
+        basePort: 16000
+      workers:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--address=$(POD_NAME).worker-pod.$(NAMESPACE):16000"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should configure resource requests and limits overrides
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+        resources:
+          cpu: "8"
+          memory: "32Gi"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "8"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: "32Gi"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: "8"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: "32Gi"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should configure node affinity and tolerations overrides
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+        nodeLabelKey: "custom-role"
+        nodeLabelValue: "custom-worker"
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: "custom-role"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]
+          value: "custom-worker"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: "custom-role"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.tolerations[0].value
+          value: "custom-worker"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should omit node affinity and tolerations when nodeLabelKey is empty but retain pod anti-affinity
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+        nodeLabelKey: ""
+    asserts:
+      - isNull:
+          path: spec.template.spec.affinity.nodeAffinity
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[0].topologyKey
+          value: "kubernetes.io/hostname"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - isNull:
+          path: spec.template.spec.tolerations
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should override affinity when workers.affinity is specified
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: "custom-node"
+                      operator: In
+                      values:
+                        - "fast"
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: "custom-node"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - isNull:
+          path: spec.template.spec.affinity.podAntiAffinity
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should configure storage size and class overrides
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+        storage:
+          size: "50Gi"
+          storageClassName: "premium-rwo"
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: "50Gi"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: "premium-rwo"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should omit storageClassName when empty
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+        storage:
+          size: "20Gi"
+          storageClassName: ""
+    asserts:
+      - isNull:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should configure imagePullSecrets when image.pullSecret is set
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+      image:
+        pullSecret: "custom-pull-secret"
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: "custom-pull-secret"
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should not configure imagePullSecrets by default
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+    asserts:
+      - isNull:
+          path: spec.template.spec.imagePullSecrets
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should configure container security context
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: false
+        documentIndex: 1
+        template: worker-statefulset.yaml
+
+  - it: should mount correct volumes
+    set:
+      currentLocation: us
+      workers:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: worker-storage
+            mountPath: /spanner
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config-volume
+            mountPath: /spanner/conf
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp-volume
+            mountPath: /tmp
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tls-certs
+            mountPath: /spanner/tls
+            readOnly: true
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: spanner-license-key
+            mountPath: /spanner/license
+            readOnly: true
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: spanner-license-key
+            secret:
+              secretName: spanner-license-key
+              optional: true
+              defaultMode: 256
+              items:
+                - key: LICENSE_KEY
+                  path: license
+        documentIndex: 1
+        template: worker-statefulset.yaml

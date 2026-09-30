@@ -1,0 +1,43 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This is required only if spanner is being deployed in multi-cluster setup. So that pods
+# in other clusters can use this to resolve the dns name.
+
+# You need to run dns-setup.sh after helm install to ensure dns lookups work across clusters.
+
+{{- if $.Values.deployment.multiCluster }}
+{{- $platformValues := include "spanner-omni.PlatformValues" . | fromYaml }}
+apiVersion: v1
+kind: Service
+metadata:
+  {{- if $platformValues.serviceAnnotations }}
+  annotations:
+    {{- toYaml $platformValues.serviceAnnotations | nindent 4 }}
+  {{- end }}
+  labels:
+    k8s-app: kube-dns
+  name: spanner-dns
+  namespace: kube-system
+spec:
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+    targetPort: 53
+  selector:
+    k8s-app: kube-dns
+  sessionAffinity: None
+  type: LoadBalancer
+{{- end }}

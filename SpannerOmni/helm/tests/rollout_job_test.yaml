@@ -1,0 +1,162 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Spanner Rollout Job Tests
+templates:
+  - rollout-job.yaml
+
+tests:
+  - it: should not render the job on install
+    set:
+      rollout:
+        staggered: true
+      deployment:
+        singleServer: false
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+            - name: "test-zone-b"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: rollout-job.yaml
+
+  - it: should render the job on upgrade with multiple zones
+    set:
+      rollout:
+        staggered: true
+      deployment:
+        singleServer: false
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+            - name: "test-zone-b"
+    release:
+      upgrade: true
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: rollout-job.yaml
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: bitnami/kubectl:latest
+        template: rollout-job.yaml
+
+  - it: should render the job on upgrade with custom image
+    set:
+      rollout:
+        staggered: true
+        image:
+          repository: my-custom-kubectl
+          tag: v1.0
+      deployment:
+        singleServer: false
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+            - name: "test-zone-b"
+    release:
+      upgrade: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: my-custom-kubectl:v1.0
+        template: rollout-job.yaml
+
+  - it: should not render the job on upgrade if there is only one zone
+    set:
+      rollout:
+        staggered: true
+      deployment:
+        singleServer: false
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+    release:
+      upgrade: true
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: rollout-job.yaml
+
+  - it: should not render the job when rollout.staggered is false
+    set:
+      rollout:
+        staggered: false
+      deployment:
+        singleServer: false
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+            - name: "test-zone-b"
+    release:
+      upgrade: true
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: rollout-job.yaml
+
+  - it: should configure dedicated root and non-root statefulset names in rollout script for scale-out deployment
+    set:
+      rollout:
+        staggered: true
+      deployment:
+        singleServer: false
+        replicasPerZone: 5
+        rootServersPerZone: 3
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+              shortName: "a"
+            - name: "test-zone-b"
+              shortName: "b"
+    release:
+      upgrade: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: 'STS_NAMES=\("spanner-a" "spanner-a-rt" "spanner-b" "spanner-b-rt" \)'
+        template: rollout-job.yaml
+
+  - it: should configure imagePullSecrets and imagePullPolicy when specified
+    set:
+      rollout:
+        staggered: true
+        image:
+          pullPolicy: Always
+          pullSecret: my-regcred
+      deployment:
+        singleServer: false
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+            - name: "test-zone-b"
+    release:
+      upgrade: true
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: my-regcred
+        template: rollout-job.yaml
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+        template: rollout-job.yaml

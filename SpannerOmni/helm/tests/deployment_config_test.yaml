@@ -1,0 +1,247 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Deployment Config Tests
+templates:
+  - spanner-deployment-config.yaml
+
+tests:
+  - it: should include replica_type when specified
+    set:
+      global:
+        insecureMode: true
+      locations:
+        - name: us
+          namespace: ns1
+          zones:
+            - name: us-a
+              replicaType: READ_ONLY
+    asserts:
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "replica_type: READ_ONLY"
+        template: spanner-deployment-config.yaml
+
+  - it: should not include replica_type when not specified
+    set:
+      global:
+        insecureMode: true
+      locations:
+        - name: us
+          namespace: ns1
+          zones:
+            - name: us-a
+    asserts:
+      - notMatchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "replica_type:"
+        template: spanner-deployment-config.yaml
+
+  - it: should configure deployment_settings when global.insecureMode is true
+    set:
+      global:
+        insecureMode: true
+      locations:
+        - name: us
+          namespace: ns1
+          zones:
+            - name: us-a
+    asserts:
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "insecure_mode: true"
+        template: spanner-deployment-config.yaml
+
+  - it: should configure insecure_mode false when global.insecureMode is false
+    set:
+      global:
+        insecureMode: false
+      locations:
+        - name: us
+          namespace: ns1
+          zones:
+            - name: us-a
+    asserts:
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "insecure_mode: false"
+        template: spanner-deployment-config.yaml
+
+  - it: should configure insecure_mode false and auth methods when global.insecureMode is false and auth is enabled
+    set:
+      global:
+        insecureMode: false
+      deployment:
+        enableClientCertificateAuthentication: true
+        enablePasswordAuthentication: true
+      locations:
+        - name: us
+          namespace: ns1
+          zones:
+            - name: us-a
+    asserts:
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "insecure_mode: false"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "AUTHENTICATION_METHOD_CLIENT_CERTIFICATE"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "AUTHENTICATION_METHOD_PASSWORD"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "password_authentication_protocol: PASSWORD_AUTHENTICATION_PROTOCOL_OPAQUE"
+        template: spanner-deployment-config.yaml
+
+  - it: should configure host without -rt for singleServer zone and with -rt for dedicated root zone
+    set:
+      global:
+        insecureMode: true
+      locations:
+        - name: us
+          namespace: ns1
+          zones:
+            - name: us-a
+              shortName: a
+              singleServer: true
+            - name: us-b
+              shortName: b
+              rootServers: 1
+    asserts:
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "host: spanner-a-0.pod.ns1"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "host: spanner-b-rt-0.pod.ns1"
+        template: spanner-deployment-config.yaml
+  - it: should configure single_server deployment config when deployment.singleServer is true
+    set:
+      deployment:
+        singleServer: true
+      global:
+        insecureMode: true
+    asserts:
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "single_server: true"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "name: default"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "host: localhost"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "insecure_mode: true"
+        template: spanner-deployment-config.yaml
+
+  - it: should configure secure single_server deployment config with password auth
+    set:
+      deployment:
+        singleServer: true
+        adminPasswordSecret: "my-admin-password-secret"
+        enablePasswordAuthentication: true
+      global:
+        insecureMode: false
+    asserts:
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "single_server: true"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "insecure_mode: false"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "AUTHENTICATION_METHOD_PASSWORD"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "password_authentication_protocol: PASSWORD_AUTHENTICATION_PROTOCOL_OPAQUE"
+        template: spanner-deployment-config.yaml
+
+  - it: should configure secure single_server deployment config with client certificate auth
+    set:
+      deployment:
+        singleServer: true
+        adminPasswordSecret: "my-admin-password-secret"
+        enableClientCertificateAuthentication: true
+        enablePasswordAuthentication: false
+      global:
+        insecureMode: false
+    asserts:
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "single_server: true"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "insecure_mode: false"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "AUTHENTICATION_METHOD_CLIENT_CERTIFICATE"
+        template: spanner-deployment-config.yaml
+      - notMatchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "AUTHENTICATION_METHOD_PASSWORD"
+        template: spanner-deployment-config.yaml
+      - notMatchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "password_authentication_protocol: PASSWORD_AUTHENTICATION_PROTOCOL_OPAQUE"
+        template: spanner-deployment-config.yaml
+
+  - it: should configure secure single_server deployment config with both auth methods
+    set:
+      deployment:
+        singleServer: true
+        adminPasswordSecret: "my-admin-password-secret"
+        enableClientCertificateAuthentication: true
+        enablePasswordAuthentication: true
+      global:
+        insecureMode: false
+    asserts:
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "single_server: true"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "insecure_mode: false"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "AUTHENTICATION_METHOD_CLIENT_CERTIFICATE"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "AUTHENTICATION_METHOD_PASSWORD"
+        template: spanner-deployment-config.yaml
+      - matchRegex:
+          path: data["deployment_config.yaml"]
+          pattern: "password_authentication_protocol: PASSWORD_AUTHENTICATION_PROTOCOL_OPAQUE"
+        template: spanner-deployment-config.yaml
+
+
+

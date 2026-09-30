@@ -1,0 +1,120 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Runs validation against helm templates
+
+name: Helm Validations
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  helm-validate:
+    permissions:
+      contents: read
+    name: "Helm Lint and Template"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          persist-credentials: false
+
+      - name: "Run Helm Lint"
+        run: |
+          helm lint SpannerOmni/helm
+          helm lint SpannerOmni/helm --set monitoring.enabled=true
+
+      - name: "Run Helm Template"
+        run: |
+          helm template SpannerOmni/helm
+          helm template SpannerOmni/helm --set monitoring.enabled=true
+
+      - name: "Run Helm Unittest"
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git
+          helm unittest SpannerOmni/helm --with-subchart=false
+          helm unittest SpannerOmni/helm/charts/monitoring
+
+      - name: "Install kubeconform"
+        run: |
+          curl -L -s https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: "Run Helm Template & Validate with Kubeconform"
+        run: |
+          helm template SpannerOmni/helm | kubeconform -strict -summary
+          helm template SpannerOmni/helm --set monitoring.enabled=true | kubeconform -strict -summary
+
+      - name: "Run Helm Template & Validate with Kubeconform for all platforms"
+        run: |
+          for platform in gke eks aks vsphere; do
+            echo "--------------------------------"
+            echo "Testing platform: $platform"
+            echo "--------------------------------"
+            helm template SpannerOmni/helm --set platform=$platform | kubeconform -strict -summary
+          done
+
+  helm-dry-run:
+    permissions:
+      contents: read
+    name: "Dry-Run against KinD"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          persist-credentials: false
+
+      - name: "Create KinD Cluster"
+        uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde # v1.10.0
+
+      - name: "Create Namespaces"
+        run: |
+          kubectl create namespace spanner-ns || true
+
+      - name: "Helm Install Dry-Run"
+        run: |
+          helm install spanner-omni SpannerOmni/helm --dry-run --debug
+          helm install spanner-omni SpannerOmni/helm --dry-run --debug --set monitoring.enabled=true
+
+  validate-deployment_config:
+    permissions:
+      contents: read
+    name: "Validate deployment config"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          persist-credentials: false
+
+      - name: Render and Extract Config
+        run: |
+          helm template spanner-omni SpannerOmni/helm -s templates/spanner-deployment-config.yaml | \
+          yq '.data["deployment_config.yaml"]' > temp_config.yaml
+
+      - name: Validate YAML Schema
+        uses: cardinalby/schema-validator-action@95ce895b6846cc7d931785fcaa46c84816753612 # 3.1.2
+        with:
+          file: "temp_config.yaml"
+          schema: ".github/workflows/schema.json"
+

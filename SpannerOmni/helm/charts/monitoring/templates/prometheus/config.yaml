@@ -1,0 +1,119 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-server-conf
+  namespace: {{ $.Values.namespace | default "monitoring" }}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 10s
+      evaluation_interval: 10s
+    scrape_configs:
+      - job_name: 'spanner'
+        honor_labels: true
+        metrics_path: '/metrics'
+        scheme: {{ if eq $.Values.global.insecureMode false }}https{{ else }}http{{ end }}
+        {{- if eq $.Values.global.insecureMode false }}
+        tls_config:
+          insecure_skip_verify: true
+        {{- end }}
+        http_sd_configs:
+          - url: "{{ if eq $.Values.global.insecureMode false }}https{{ else }}http{{ end }}://spanner.{{ $.Release.Namespace }}.svc.cluster.local:15012/metrics/targets"
+            {{- if eq $.Values.global.insecureMode false }}
+            tls_config:
+              insecure_skip_verify: true
+            {{- end }}
+            refresh_interval: 30s
+        relabel_configs:
+         - source_labels: [__address__]
+           regex: 'localhost:(.*)'
+           target_label: __address__
+           replacement: 'spanner.{{ $.Release.Namespace }}.svc.cluster.local:${1}'
+           action: replace
+        metric_relabel_configs:
+         - regex: 'instance'
+           action: labeldrop
+      - job_name: 'spanner-workers'
+        honor_labels: true
+        metrics_path: '/metrics'
+        scheme: {{ if eq $.Values.global.insecureMode false }}https{{ else }}http{{ end }}
+        {{- if eq $.Values.global.insecureMode false }}
+        tls_config:
+          insecure_skip_verify: true
+        {{- end }}
+        http_sd_configs:
+          - url: "{{ if eq $.Values.global.insecureMode false }}https{{ else }}http{{ end }}://spanner.{{ $.Release.Namespace }}.svc.cluster.local:15012/metrics/targets/workers"
+            {{- if eq $.Values.global.insecureMode false }}
+            tls_config:
+              insecure_skip_verify: true
+            {{- end }}
+            refresh_interval: 30s
+        relabel_configs:
+         - source_labels: [__address__]
+           regex: 'localhost:(.*)'
+           target_label: __address__
+           replacement: 'spanner.{{ $.Release.Namespace }}.svc.cluster.local:${1}'
+           action: replace
+        metric_relabel_configs:
+         - regex: 'instance'
+           action: labeldrop
+      {{- if $.Values.prometheus.enablePushgateway }}
+      - job_name: 'prometheus-pushgateway'
+        honor_labels: true
+        static_configs:
+          - targets: ['prometheus-pushgateway.{{ $.Values.namespace | default "monitoring" }}.svc.cluster.local:9091']
+      {{- end }}
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      {{- if $.Values.prometheus.enableCadvisorScrapeJob }}
+      - job_name: kubernetes-cadvisor
+        honor_timestamps: true
+        metrics_path: /metrics/cadvisor
+        scheme: https
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        kubernetes_sd_configs:
+        - role: node
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_node_name]
+            action: replace
+            target_label: kubernetes_node_name
+        metric_relabel_configs:
+          - source_labels: ["pod", "id"]
+            separator: "_"
+            target_label: "name"
+      {{- end }}
+      {{- if $.Values.prometheus.enableKubeletScrapeJob }}
+      - job_name: kubernetes-kubelet
+        honor_timestamps: true
+        metrics_path: /metrics
+        scheme: https
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        kubernetes_sd_configs:
+        - role: node
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_node_name]
+            action: replace
+            target_label: kubernetes_node_name
+      {{- end }}
+

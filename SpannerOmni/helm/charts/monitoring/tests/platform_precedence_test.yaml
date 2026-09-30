@@ -1,0 +1,57 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Monitoring Platform Precedence Tests
+templates:
+  - templates/prometheus/deployment.yaml
+
+tests:
+  - it: should not set storage class when no platform is set
+    set:
+      global:
+        insecureMode: true
+    asserts:
+      - isNull:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+
+  - it: should use platform storage class when platform is set
+    set:
+      global:
+        platform: gke
+        insecureMode: true
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: premium-rwo
+
+  - it: should use argument value when no platform is set
+    set:
+      defaultStorageClass: custom-storage
+      global:
+        insecureMode: true
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: custom-storage
+
+  - it: should use argument value even when platform is set (precedence)
+    set:
+      global:
+        platform: gke
+        insecureMode: true
+      defaultStorageClass: custom-storage
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: custom-storage

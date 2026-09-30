@@ -1,0 +1,346 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Below options can be overridden for multi-tenant deployments in custom namespaces
+# Overrides the chart name for resources.
+nameOverride: ""
+# Overrides the full release name for resources.
+fullnameOverride: ""
+# Overrides the namespace for the deployment.
+namespaceOverride: ""
+
+# The license key for Spanner Omni deployment. Defaults to "" (no license).
+# Recommend using the --set-file option during chart installation to avoid leaking
+# the sensitive key in your shell command history or process logs.
+# For example: --set-file licenseKey=/path/to/license.txt.
+licenseKey: ""
+
+
+# The name of the current location for multi-location deployments.
+# This must match with name of one of the locations below.
+currentLocation: ""
+
+# Global section for all subcharts (like monitoring)
+global:
+  # Set a platform to load specific overrides (e.g., "gke", "eks").
+  # This will load values-%platform.yaml from the chart directory.
+  platform: ""
+  # Spanner uses plaintext GRPC communications by default. For production deployments, change this to
+  # false to enable TLS or mTLS. If you disable insecureMode without providing certificates, the deployment will fail.
+  insecureMode: true
+
+image:
+  # Container repository for Spanner Omni image. Override if you are copying image and hosting locally.
+  repository: us-docker.pkg.dev/spanner-omni/images/spanner-omni-server
+  # Image pull policy.
+  pullPolicy: IfNotPresent
+  # Image tag. Defaults to Chart's appVersion if empty.
+  tag: ""
+  # Optional explicit SHA256 digest override. This takes precedence over tag if provided.
+  digest: ""
+  # Secret for pulling image from private repositories.
+  pullSecret: ""
+
+# Rollout configuration for spanner-omni.
+rollout:
+  # Kubectl image used by rollout job. Rollout job ensures that updates are progressed one zone after another.
+  image:
+    repository: bitnami/kubectl
+    tag: latest
+    digest: ""
+    pullPolicy: IfNotPresent
+    # Secret for pulling image from private repositories.
+    pullSecret: ""
+  # Wait time between zone updates in seconds. Defaults to 10m (600s).
+  waitSeconds: 600
+  # Enable automated staggered rollout of zones. Defaults to true. If this is disabled, all zones will be updated concurently.
+  staggered: true
+
+
+# Console configuration for Spanner Omni.
+console:
+  # Disabling this will not deploy the UI console.
+  # If not explicitly set, defaults to true for insecure deployments and false for secure deployments.
+  enabled: null
+  # Container image for the Spanner Omni UI.
+  image:
+    # Defaults to core image repository with -ui suffix appended.
+    repository: ""
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  # Number of replicas for the UI deployment. If not set, defaulted to 1 for single-server and 2 for zonal and 1 per zone for multi-zone.
+  replicas: null
+  service:
+    # Defaults to LoadBalancer if the replicas is greater than one otherwise hostport.
+    type: ""
+    # Node port to use for UI console if the type is NodePort. Otherwise it would base_port + 26.
+    nodePort: 30026
+    # Port for the UI console service. If not set, defaults to basePort + 26.
+    port: null
+  # Optional custom node selector or affinity specifically mapped against the web administrative UI
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+  # Resource requests and limits for the interactive console web service
+  resources:
+    requests:
+      cpu: "20m"
+      memory: "256Mi"
+    limits:
+      cpu: "100m"
+      memory: "512Mi"
+
+# Resource requests and limits for the Spanner container.
+resources:
+  cpu: 4
+  memory: 16Gi
+
+# Service configuration for Spanner.
+service:
+  # Service type (e.g., NodePort, ClusterIP). Defaults to NodePort for single server deployment and LoadBalancer for multi-server deployment.
+  type: ""
+  # Node port to use if service type is NodePort.
+  nodePort: 30000
+
+# Storage configuration for Spanner data and logs.
+storage:
+  data:
+    # Size of the data volume claim. Default to 100G for each pod
+    size: "100Gi"
+  logs:
+    # Size of the logs volume claim. Default to 20G for each pod
+    size: "20Gi"
+  tmp:
+    # Size of the temp volume limit. Default to 5Gi for each pod
+    size: "512Mi"
+
+# Skip prepare upgrade job. DO NOT SKIP THIS for multi-server deployments. Spanner depends on
+# the metadata upgrade before the binary is updated.
+# Note: For single-server deployments (deployment.singleServer=true), the prepare upgrade job is
+# automatically skipped because single-server mode binds internal services strictly to loopback (127.0.0.1).
+# For single-server, run Phase 1 locally via an ephemeral debug container prior to helm upgrade.
+skipPrepareUpgrade: false
+
+deployment:
+  # Custom configurations to be appended to spanner.cfg in the default spanner-config ConfigMap.
+  # You can copy-paste properties here or pass a configuration file using `--set-file deployment.spannerConfig=path/to/spanner.cfg`.
+  # Note: This cannot be set simultaneously with deployment.featureFlagsConfigMap.
+  # Example:
+  # spannerConfig: |
+  #   sample_property=value
+  #   base_services.sample_property=value
+  spannerConfig: ""
+  # Name of an existing ConfigMap to mount for spanner.cfg overrides (e.g. tweaking internal behavior flags). 
+  # Note: This ConfigMap MUST reside in the same namespace as the deployment.
+  featureFlagsConfigMap: ""
+  # Deploys a single server without zonal configuration/affinities.
+  singleServer: false
+  # A comma-separated list of IP addresses to listen on (e.g. "0.0.0.0,[::]").
+  # If not set, uses the backend default.
+  listenAddresses: ""
+  # Total number of servers per zone including root servers, this can be overridden using different values at zone level. Defaults to 5.
+  # When dedicated root servers are enabled, non-root servers are calculated as (replicasPerZone - rootServersPerZone).
+  replicasPerZone: 5
+  # Number of root servers per zone, this can be overridden using different values at zone level. Defaults to 3.
+  rootServersPerZone: 3
+  # Configuration for root servers if you would like to use different topology than rest of servers.
+  # rootServers:
+    # Use this value to use different node selector label for root servers.
+    # nodeSelector: {}
+    # Use this value to use different tolerations for root servers.
+    # tolerations: []
+    # Use this value to use different affinity for root servers.
+    # affinity: {}
+    # Use this value to use different resource requests and limits for root servers.
+    # resources: {}
+    # Use this value to use different storage sizing for root servers.
+    # storage:
+    #   data:
+    #     size: ""
+    #   logs:
+    #     size: ""
+  # Percentage of pods that can be unavailable during rolling update. Defaults to 5%. If calculated value is less than 1, it will be rounded up to 1 to prevent deadlocks.
+  maxUnavailablePercentage: 5
+  # Number of pods that can be unavailable during voluntary disruption (PodDisruptionBudget). Defaults to 1.
+  pdbMaxUnavailable: 1
+  # Enable mTLS for Spanner deployment. Defaults to false.
+  enableClientCertificateAuthentication: false
+  # Enable password authentication for Spanner deployment. Defaults to true.
+  enablePasswordAuthentication: true
+  # Name of a pre-created Kubernetes Secret containing the admin password under the "password" key.
+  # Optional (uses Spanner's default password if omitted), but highly recommended for security reasons.
+  # Note: This Secret MUST reside in the same namespace as the deployment.
+  adminPasswordSecret: ""
+  # Tracer endpoint (e.g., endpoint for Jaeger collector). Defaults to "" (disabled).
+  traceExporterEndpoint: ""
+  # Whether to use a single time server. Disables HA timeserver if true. Defaults to false.
+  useSingleTimeServer: false
+  # Base port for Spanner services. Defaults to 15000.
+  basePort: 15000
+  # Enable multi-cluster deployment. If true, Helm sets up LoadBalancer
+  # for DNS resolution across clusters. Requires more than one location to be defined. Defaults to false.
+  multiCluster: false
+
+# Probes configuration for Spanner container. Check for readiness every 10s and restart if it is unavailable for 5 minutes.
+probes:
+  readiness:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  liveness:
+    enabled: true
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 10
+  startup:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 30
+
+# Security Context configuration for Spanner pod and container.
+securityContext:
+  pod:
+    runAsUser: 65534
+    runAsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  container:
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    privileged: false
+
+# Affinity for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+# If not set, default anti-affinity by hostname is applied to ensure pods are distributed across nodes.
+affinity: {}
+
+# Node Selector and Tolerations for targeting specific nodes or handling taints.
+nodeSelector: {}
+tolerations: []
+
+
+# Resource requests and limits for all helper/operational jobs (bootstrap, upgrade, rollout).
+jobs:
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+
+# Monitoring Stack integration.
+# If enabled, deploying the chart will also install the monitoring subchart which includes
+# Prometheus, Grafana, and Jaeger. In cases of multiple location deployments, you can install monitoring in any one of the locations using `--set monitoring.enabled=true`.
+# Detailed configuration for Prometheus, Grafana, Jaeger, nodeSelector, tolerations, and storage can be found in charts/monitoring/values.yaml.
+monitoring:
+  # Enable monitoring stack. Defaults to false.
+  enabled: false
+
+# IMPORTANT: DO NOT OVERRIDE BELOW VALUES. Instead, use the same keys without the `defaults.` prefix.
+# defaults section holds the base values for platform-dependent attributes. To override these fields, always use the top-level keys
+# (e.g., `--set dataStorageClass=my-sc`) and NOT under this section
+# (e.g., NOT `--set defaults.dataStorageClass=my-sc`).
+# Overrides under `defaults` will be ignored if a platform also defines that key!
+# @ignored
+defaults:
+  # Create custom storage classes.
+  createStorageClasses: false
+  # List of storage classes to create when createStorageClasses is true.
+  storageClasses:
+    - name: my_sc
+      provisioner: kubernetes.io/no-provisioner
+      volumeBindingMode: WaitForFirstConsumer
+
+  dataStorageClass: ""
+  logsStorageClass: ""
+  serviceAnnotations: {}
+  extraVolumes: []
+  extraVolumeMounts: []
+  forcePrivilegedContainer: false
+  extraInitContainers: []
+
+  # The overall cluster topology for single or multi-region layout. locations will be ignored if singleServer is true.
+  # You can specify the current location for helm deployment context via `--set currentLocation=<name>`
+  # Each location must be mapped to a unique namespace.
+
+  # When you have multiple locations, each location will have its own namespace. The Helm chart should be installed for
+  # every location. The Kubernetes clusters for each location can be the same or different. The bootstrap job will be
+  # triggered in the last cluster, hence it is preferred to install in the same order as locations defined below in order to
+  # simulate bootstrap-job triggering after everything is up and ready. Bootstrap job waits for reachability of all the location
+  # and pods before it can complete.
+  locations:
+    - name: us
+      # Optional for single location deployment, mandatory for multi-location deployment where each location
+      # should be in different namespace.
+      namespace: ""
+      zones:
+        - name: "us-a"
+          shortName: "a"
+          replicas: 1 # Precedence over deployment.replicasPerZone
+          rootServers: 1 # Precedence over deployment.rootServersPerZone
+          singleServer: true # If this zone is single server zone (i.e zone will only have single server always)
+          replicaType: "READ_WRITE" # Allowed values: READ_WRITE, WITNESS, READ_ONLY
+        - name: "us-b"
+          shortName: "b"
+        - name: "us-c"
+          shortName: "c"
+
+# Compute Workers Configuration
+# ==============================================================================
+# Workers are dedicated nodes designed to offload resource-intensive
+# operations (such as ANN vector backfills and Graph algorithms) from the core
+# database pods. They run in a StatefulSet with Persistent Volumes.
+# ==============================================================================
+workers:
+  # Enable or disable the deployment of compute workers.
+  enabled: false
+
+  # Default static replica count.
+  replicas: 1
+
+  # Optional list of root server addresses (host:port) to join.
+  # If omitted or empty, Helm will automatically derive this from the cluster's root servers.
+  joinServers: []
+
+  # Resource specifications for the Worker pods.
+  # Workers run heavy calculations, so they should be assigned powerful nodes.
+  resources:
+    cpu: "6"
+    memory: "24Gi"
+
+  # Node Placement Control
+  nodeLabelKey: "spanner-role"
+  nodeLabelValue: "workers"
+
+  # Storage Control for StatefulSet PVCs
+  storage:
+    size: "20Gi"
+    storageClassName: ""
+
+  # Number of worker pods that can be unavailable during voluntary disruption (PodDisruptionBudget). Defaults to 1.
+  pdbMaxUnavailable: 1
+
+  # Optional custom affinity for workers. If not set, default anti-affinity by hostname is applied to ensure workers are distributed across nodes.
+  affinity: {}
+

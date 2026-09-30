@@ -1,0 +1,49 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- $platformValues := include "monitoring.PlatformValues" . | fromYaml }}
+apiVersion: v1
+kind: Service
+metadata:
+    name: jaeger
+    namespace: {{ $.Values.namespace | default "monitoring" }}
+    {{- if $platformValues.service.annotations }}
+    annotations:
+      {{- toYaml $platformValues.service.annotations | nindent 6 }}
+    {{- end }}
+spec:
+    selector:
+        app: jaeger
+    {{- $serviceType := $.Values.service.type }}
+    {{- if not $serviceType }}
+      {{- if eq (int $.Values.jaeger.replicas) 1 }}
+        {{- $serviceType = "NodePort" }}
+      {{- else }}
+        {{- $serviceType = "ClusterIP" }}
+      {{- end }}
+    {{- end }}
+    {{- if eq $serviceType "ClusterIP" }}
+    clusterIP: None
+    {{- end }}
+    type: {{ $serviceType }}
+    ports:
+    - name: "ui"
+      port: {{ $.Values.jaeger.ports.ui }}
+      targetPort: {{ $.Values.jaeger.ports.ui }}
+    - name: "otlp-grpc"
+      port: {{ $.Values.jaeger.ports.otlpGrpc }}
+      targetPort: {{ $.Values.jaeger.ports.otlpGrpc }}
+    - name: "otlp-http"
+      port: {{ $.Values.jaeger.ports.otlpHttp }}
+      targetPort: {{ $.Values.jaeger.ports.otlpHttp }}

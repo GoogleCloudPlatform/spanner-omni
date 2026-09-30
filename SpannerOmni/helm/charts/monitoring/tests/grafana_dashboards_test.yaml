@@ -1,0 +1,199 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Grafana Dashboards and Alert Rules Filter Tests
+templates:
+  - templates/grafana/configmaps.yaml
+
+tests:
+  - it: should include job=spanner filter in backups-and-restores dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-backups-and-restores-dashboard
+    asserts:
+      - matchRegex:
+          path: data["backups_and_restores.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["backups_and_restores.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in compactions dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-compactions-dashboard
+    asserts:
+      - matchRegex:
+          path: data["compactions.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["compactions.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in deployment-insights dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-deployment-insights-dashboard
+    asserts:
+      - matchRegex:
+          path: data["deployment_insights.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["deployment_insights.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in grpc dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-grpc-dashboard
+    asserts:
+      - matchRegex:
+          path: data["grpc.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["grpc.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in overview dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-overview-dashboard
+    asserts:
+      - matchRegex:
+          path: data["overview.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["overview.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in shared-log dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-shared-log-dashboard
+    asserts:
+      - matchRegex:
+          path: data["shared_log.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["shared_log.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in spanner-filesystem dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-spanner-filesystem-dashboard
+    asserts:
+      - matchRegex:
+          path: data["spanner_filesystem.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["spanner_filesystem.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in splits-merges-moves dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-splits-merges-moves-dashboard
+    asserts:
+      - matchRegex:
+          path: data["splits_merges_moves.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["splits_merges_moves.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in system-insights dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-system-insights-dashboard
+    asserts:
+      - matchRegex:
+          path: data["system_insights.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["system_insights.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in tablets dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-tablets-dashboard
+    asserts:
+      - matchRegex:
+          path: data["tablets.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["tablets.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in truetime dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-truetime-dashboard
+    asserts:
+      - matchRegex:
+          path: data["truetime.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner\\"'
+      - notMatchRegex:
+          path: data["truetime.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner-workers filter in worker-insights dashboard queries
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-worker-insights-dashboard
+    asserts:
+      - matchRegex:
+          path: data["worker_insights.json"]
+          pattern: '"expr":\s*"[^"]*job=\\"spanner-workers\\"'
+      - notMatchRegex:
+          path: data["worker_insights.json"]
+          pattern: '"name":\s*"job_filter"'
+  - it: should include job=spanner filter in alert_rules.yaml expressions
+    set:
+      global:
+        insecureMode: false
+    documentSelector:
+      path: metadata.name
+      value: grafana-alert-rules
+    asserts:
+      - matchRegex:
+          path: data["alert_rules.yaml"]
+          pattern: 'expr:\s*\|-\s*\n\s*[^\n]*job="spanner"'
+

@@ -1,0 +1,140 @@
+{
+  "file": "SpannerOmni/helm/charts/monitoring/grafana/provisioning/alerting/alert_rules.yaml",
+  "groups": [
+    {
+      "name": "Spanner Omni Availability",
+      "rules": [
+        {
+          "uid": "spanner-pods-unhealthy",
+          "title": "SpannerPodsUnhealthy",
+          "expr": "1 - avg(up{job=\"spanner\"})"
+        },
+        {
+          "uid": "spanner-truetime-unavail-servers",
+          "title": "TrueTimeUnavailableAcrossServers",
+          "expr": "count(true_time_is_available{job=\"spanner\"} == 0)"
+        },
+        {
+          "uid": "spanner-clock-sla-violation",
+          "title": "ClockSlaViolation",
+          "expr": "sla_tester_is_violator{job=\"spanner\"} > 0 or rate(sla_tester_violation_count{job=\"spanner\"}[5m]) > 0"
+        },
+        {
+          "uid": "spanner-unassigned-tablets",
+          "title": "UnassignedTablets",
+          "expr": "sum by (spanner_zone) (spanner_zonemaster_unassigned_tablets_by_database_and_type{job=\"spanner\"})"
+        },
+        {
+          "uid": "spanner-booting-tablets-high",
+          "title": "BootingTabletsHigh",
+          "expr": "(sum by (spanner_zone) (spanner_paxos_tablet_count{job=\"spanner\", paxos_state=\"Booting\"}) / sum by (spanner_zone) (spanner_paxos_tablet_count{job=\"spanner\"}))"
+        }
+      ]
+    },
+    {
+      "name": "Spanner Omni Latency",
+      "rules": [
+        {
+          "uid": "spanner-zone-paxos-repl-delay-high",
+          "title": "ZonePaxosReplicationDelayHigh",
+          "expr": "histogram_quantile(0.90, sum by (le, spanner_zone) (rate(spanner_paxos_replication_delay_distribution_bucket{job=\"spanner\"}[5m])))\n> on() group_left() (\n  3 * quantile(0.5,\n    histogram_quantile(0.90, sum by (le, spanner_zone) (rate(spanner_paxos_replication_delay_distribution_bucket{job=\"spanner\"}[5m])))\n  )\n)\nand (\n  histogram_quantile(0.90, sum by (le, spanner_zone) (rate(spanner_paxos_replication_delay_distribution_bucket{job=\"spanner\"}[5m]))) > 1.0\n)"
+        },
+        {
+          "uid": "spanner-truetime-high-uncertainty",
+          "title": "TrueTimeHighUncertainityInterval",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(true_time_interval_uncertainty_bucket{job=\"spanner\"}[5m])))"
+        },
+        {
+          "uid": "spanner-server-read-latency-high",
+          "title": "ServerReadLatencyHigh",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(spanner_api_request_latencies_bucket{job=\"spanner\", method=~\".*ExecuteSql|.*ExecuteStreamingSql|.*Read|.*StreamingRead\"}[1m])))"
+        },
+        {
+          "uid": "spanner-server-write-latency-high",
+          "title": "ServerWriteLatencyHigh",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(spanner_api_request_latencies_bucket{job=\"spanner\", method=~\".*Commit|.*BatchWrite|.*ExecuteBatchDml\"}[1m])))"
+        },
+        {
+          "uid": "spanner-tx-lock-wait-time-high",
+          "title": "TransactionLockWaitTimeHigh",
+          "expr": "sum(rate(spanner_total_lock_wait_time{job=\"spanner\"}[5m])) / sum(rate(spanner_api_request_count{job=\"spanner\"}[5m]))"
+        },
+        {
+          "uid": "spanner-spanhostfs-write-lat-high",
+          "title": "SpanHostFsWriteLatencyHigh",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(filesystem_latency_bucket{job=\"spanner\", operation=\"Flush\"}[5m])))"
+        },
+        {
+          "uid": "spanner-spanhostfs-read-lat-high",
+          "title": "SpanHostFsReadLatencyHigh",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(filesystem_latency_bucket{job=\"spanner\", operation=~\"PRead|Read\"}[5m])))"
+        }
+      ]
+    },
+    {
+      "name": "Spanner Omni Error Rate & SLA",
+      "rules": [
+        {
+          "uid": "spanner-api-error-rate-high",
+          "title": "ApiErrorRateHigh",
+          "expr": "(sum(rate(server_canonical_status_count{job=\"spanner\", canonical_code!=\"OK\", command=~\".*ExecuteSql|.*ExecuteStreamingSql|.*Read|.*StreamingRead|.*Commit|.*BatchWrite|.*ExecuteBatchDml\"}[1m])) or vector(0))\n/\nsum(rate(server_completed_rpcs{job=\"spanner\", command=~\".*ExecuteSql|.*ExecuteStreamingSql|.*Read|.*StreamingRead|.*Commit|.*BatchWrite|.*ExecuteBatchDml\"}[1m]))"
+        },
+        {
+          "uid": "spanner-transaction-abort-rate",
+          "title": "TransactionAbortRate",
+          "expr": "sum(rate(spanner_transaction_stat_total_commit_attempt_count{job=\"spanner\", status=\"abort\"}[5m]))\n/\nsum(rate(spanner_transaction_stat_total_commit_attempt_count{job=\"spanner\"}[5m]))"
+        },
+        {
+          "uid": "spanner-spanhostfs-error-rate-high",
+          "title": "SpanHostFsErrorRateHigh",
+          "expr": "(sum(rate(filesystem_canonical_status_count{job=\"spanner\", status!=\"OK\"}[5m])) or vector(0))\n/\nsum(rate(filesystem_canonical_status_count{job=\"spanner\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "name": "Spanner Omni Resource Usage",
+      "rules": [
+        {
+          "uid": "spanner-cpu-util-high",
+          "title": "CPUUtilizationHigh",
+          "expr": "sum(rate(proc_cpu_usage{job=\"spanner\"}[5m])) / sum(spanner_box_vm_cpu_total{job=\"spanner\"})"
+        },
+        {
+          "uid": "spanner-cpu-util-warning",
+          "title": "CPUUtilizationHighWarning",
+          "expr": "sum(rate(proc_cpu_usage{job=\"spanner\"}[5m])) / sum(spanner_box_vm_cpu_total{job=\"spanner\"})"
+        },
+        {
+          "uid": "spanner-non-cache-mem-high",
+          "title": "NonCacheMemoryUtilizationHigh",
+          "expr": "(sum(spanner_box_vm_memory_usage{job=\"spanner\"}) - sum(spanner_server_memory_usage{job=\"spanner\", category=\"cache\"}))\n/\nsum(spanner_box_vm_memory_total{job=\"spanner\"})"
+        },
+        {
+          "uid": "spanner-non-cache-mem-warning",
+          "title": "NonCacheMemoryUtilizationHighWarning",
+          "expr": "(sum(spanner_box_vm_memory_usage{job=\"spanner\"}) - sum(spanner_server_memory_usage{job=\"spanner\", category=\"cache\"}))\n/\nsum(spanner_box_vm_memory_total{job=\"spanner\"})"
+        },
+        {
+          "uid": "spanner-data-storage-util-high",
+          "title": "DataStorageUtilizationHigh",
+          "expr": "sum by (spanner_server, spanner_zone) (filesystem_size{job=\"spanner\", type=\"used\"}) / sum by (spanner_server, spanner_zone) (filesystem_size{job=\"spanner\", type=\"total\"})"
+        },
+        {
+          "uid": "spanner-data-storage-util-warning",
+          "title": "DataStorageUtilizationHighWarning",
+          "expr": "sum by (spanner_server, spanner_zone) (filesystem_size{job=\"spanner\", type=\"used\"}) / sum by (spanner_server, spanner_zone) (filesystem_size{job=\"spanner\", type=\"total\"})"
+        },
+        {
+          "uid": "spanner-log-storage-util-warning",
+          "title": "LogStorageUtilizationHighWarning",
+          "expr": "sum by (spanner_server, spanner_zone) (log_filesystem_size{job=\"spanner\", type=\"used\"}) / sum by (spanner_server, spanner_zone) (log_filesystem_size{job=\"spanner\", type=\"total\"})"
+        },
+        {
+          "uid": "spanner-storage-per-vcpu-high",
+          "title": "SpannerStoragePerVCPUTooHigh",
+          "expr": "(filesystem_size{job=\"spanner\", type=\"total\"} / 1024) / spanner_box_vm_cpu_total{job=\"spanner\"}"
+        }
+      ]
+    }
+  ]
+}

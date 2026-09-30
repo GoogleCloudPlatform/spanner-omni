@@ -1,0 +1,332 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Validations
+templates:
+  - validations.yaml
+
+tests:
+  - it: should fail if location is missing a namespace
+    set:
+      locations:
+        - name: loc1
+          zones:
+            - name: z1
+        - name: loc2
+          namespace: correct-ns
+          zones:
+            - name: z2
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Location 'loc1' is missing a namespace.*"
+
+  - it: should fail if namespaces are duplicated across locations
+    set:
+      locations:
+        - name: loc1
+          namespace: shared-ns
+        - name: loc2
+          namespace: shared-ns
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Namespace 'shared-ns' is duplicated across multiple locations.*"
+
+  - it: should fail if CLI release namespace does not match current location namespace
+    release:
+      namespace: wrong-ns
+    set:
+      currentLocation: loc1
+      locations:
+        - name: loc1
+          namespace: correct-ns
+        - name: loc2
+          namespace: other-ns
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Release namespace must match the namespace of current location.*"
+
+  - it: should fail if release namespace does not match location namespace in single-location setup
+    release:
+      namespace: spanner-ns
+    set:
+      locations:
+        - name: uscentral
+          namespace: spanner-omni
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Release namespace must match the namespace of current location.*"
+
+  - it: should fail if release namespace does not match default first location namespace when currentLocation is omitted
+    release:
+      namespace: spanner-ns
+    set:
+      locations:
+        - name: uscentral
+          namespace: spanner-omni
+        - name: uswest
+          namespace: spanner-ns
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Release namespace must match the namespace of current location.*"
+
+  - it: should fail if multi-server deployment has zero locations
+    set:
+      deployment:
+        singleServer: false
+      locations: []
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Multi-server deployments require at least one location defined.*"
+
+  - it: should pass validation successfully with correct multi-location setup
+    release:
+      namespace: ns1
+    set:
+      currentLocation: loc1
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: us-west1-a
+              shortName: a
+              rootServers: 1
+        - name: loc2
+          namespace: ns2
+          zones:
+            - name: us-west2-a
+              shortName: a
+              rootServers: 1
+    asserts:
+      - hasDocuments:
+          count: 0 # validations.yaml produces 0 documents when valid
+
+  - it: should fail if any zone has zero root servers configured
+    set:
+      deployment:
+        singleServer: false
+        rootServersPerZone: 0
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: z1
+              rootServers: 0
+    asserts:
+      - failedTemplate:
+          errorPattern: "(?i).*The number of root servers must be an odd number between 1 and 9.*"
+
+  - it: should pass cleanly and bypass all location assertions if singleServer is true
+    release:
+      namespace: ns1
+    set:
+      deployment:
+        singleServer: true
+      locations: [] # Empty locations would normally trigger a fatal error, but singleServer bypasses it!
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should fail if multiCluster is true but there is only one location
+    release:
+      namespace: ns1
+    set:
+      deployment:
+        singleServer: false
+        multiCluster: true
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: z1
+              rootServers: 1
+    asserts:
+      - failedTemplate:
+          errorPattern: "(?i).*multiCluster is true but there is only one location.*"
+
+  - it: should fail if root servers are duplicated (e.g. overlapping zone shortNames)
+    set:
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: z1
+              shortName: a
+            - name: z2
+              shortName: a
+        - name: loc2
+          namespace: ns2
+          zones:
+            - name: z3
+              shortName: c
+    asserts:
+      - failedTemplate:
+          errorPattern: "(?i).*Root server 'spanner-a-rt-0.pod.ns1' is duplicated across multiple zones!.*"
+
+  - it: should fail if console.enabled is explicitly true while insecureMode is false
+    set:
+      console:
+        enabled: true
+      global:
+        insecureMode: false
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Console is currently supported only with insecure deployments.*"
+
+  - it: should fail if a zone has an even number of root servers
+    set:
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: z1
+              rootServers: 2
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*The number of root servers must be an odd number between 1 and 9.*"
+
+  - it: should fail if a zone has more than 9 root servers
+    set:
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: z1
+              rootServers: 11
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*The number of root servers must be an odd number between 1 and 9.*"
+
+  - it: should fail if a zone has a negative number of root servers
+    set:
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: z1
+              rootServers: -1
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*The number of root servers must be an odd number between 1 and 9.*"
+
+  - it: should fail if both deployment.featureFlagsConfigMap and deployment.spannerConfig are provided
+    set:
+      deployment:
+        featureFlagsConfigMap: "my-custom-config-map"
+        spannerConfig: |
+          my_key=my_value
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Both 'deployment.featureFlagsConfigMap' and 'deployment.spannerConfig' cannot be set simultaneously.*"
+
+  - it: should fail if insecureMode is false but both cert and password auth are disabled
+    set:
+      global:
+        insecureMode: false
+      deployment:
+        enableClientCertificateAuthentication: false
+        enablePasswordAuthentication: false
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Secure mode is enabled.*but both client certificate and password authentication are disabled.*"
+
+
+  - it: should pass validation when a zone has singleServer true
+    release:
+      namespace: ns1
+    set:
+      deployment:
+        singleServer: false
+        replicasPerZone: 3
+        rootServersPerZone: 3
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: z1
+              shortName: a
+              singleServer: true
+            - name: z2
+              shortName: b
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should pass validation when all zones have singleServer true
+    release:
+      namespace: ns1
+    set:
+      deployment:
+        singleServer: false
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: z1
+              shortName: a
+              singleServer: true
+            - name: z2
+              shortName: b
+              singleServer: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+
+  - it: should pass validation in singleServer mode when insecureMode is false and adminPasswordSecret is omitted
+    set:
+      deployment:
+        singleServer: true
+      global:
+        insecureMode: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should pass validation in singleServer mode when insecureMode is false and adminPasswordSecret is provided
+    set:
+      deployment:
+        singleServer: true
+        adminPasswordSecret: "my-precreated-secret"
+      global:
+        insecureMode: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should pass validation when workers.enabled is true and currentLocation is provided
+    release:
+      namespace: ns1
+    set:
+      currentLocation: loc1
+      locations:
+        - name: loc1
+          namespace: ns1
+          zones:
+            - name: z1
+              rootServers: 1
+      workers:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0 # validations.yaml produces 0 documents when valid
+
+  - it: should fail when workers.enabled is true in singleServer mode
+    set:
+      deployment:
+        singleServer: true
+      workers:
+        enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*Worker nodes.*are not supported in single-server deployments.*"

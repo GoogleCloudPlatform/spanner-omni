@@ -1,0 +1,117 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- $platformValues := include "monitoring.PlatformValues" . | fromYaml }}
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus-server
+  namespace: {{ $.Values.namespace | default "monitoring" }}
+  labels:
+    app: prometheus-server
+spec:
+  replicas: {{ $.Values.prometheus.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: prometheus-server
+  template:
+    metadata:
+      labels:
+        app: prometheus-server
+    spec:
+      {{- $nodeSelector := $.Values.prometheus.nodeSelector | default $.Values.nodeSelector }}
+      {{- with $nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $tolerations := $.Values.prometheus.tolerations | default $.Values.tolerations }}
+      {{- with $tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $affinity := $.Values.prometheus.affinity | default $.Values.affinity }}
+      {{- with $affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        fsGroup: 2000
+        supplementalGroups:
+          - 0
+      containers:
+      - name: prometheus
+        image: {{ $.Values.prometheus.image | quote }}
+        command:
+        - /bin/prometheus
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus/
+        {{- $retSize := $.Values.prometheus.retentionSize }}
+        {{- if not $retSize }}
+          {{- $storageStr := $.Values.prometheus.storage.size | toString }}
+          {{- $sizeNum := regexFind "^[0-9]+" $storageStr | atoi }}
+          {{- $unit := regexFind "[a-zA-Z]+" $storageStr }}
+          {{- $promUnit := replace "i" "B" $unit }}   {{- /* Convert Gi -> GB */ -}}
+          {{- if and $promUnit (not (hasSuffix "B" $promUnit)) }}
+            {{- $promUnit = print $promUnit "B" }}   {{- /* Convert G -> GB */ -}}
+          {{- end }}
+          {{- $promUnit = default "GB" $promUnit }}
+          {{- $retSize = print (div (mul $sizeNum 8) 10) $promUnit }}
+        {{- end }}
+        - --storage.tsdb.retention.size={{ $retSize | default "20Gi" }}
+        - --storage.tsdb.retention.time={{ $.Values.prometheus.retentionTime | default "2y" }}
+        {{- if $.Values.prometheus.enableAdminApi }}
+        - --web.enable-admin-api
+        {{- end }}
+        securityContext:
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          privileged: false
+          runAsUser: 65534
+          runAsGroup: 65534
+          seccompProfile:
+            type: RuntimeDefault
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/prometheus
+        - name: prometheus-vol
+          mountPath: /prometheus
+        resources:
+          requests:
+            cpu: {{ $.Values.prometheus.resources.cpu | quote }}
+            memory: {{ $.Values.prometheus.resources.memory | quote }}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: prometheus-server-conf
+          defaultMode: 420
+  volumeClaimTemplates:
+  - metadata:
+      name: prometheus-vol
+    spec:
+      {{- $sc := $platformValues.prometheus.storage.className | default $platformValues.defaultStorageClass -}}
+      {{- if $sc }}
+      storageClassName: {{ $sc | quote }}
+      {{- end }}
+      volumeMode: Filesystem
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: {{ $.Values.prometheus.storage.size | quote }}

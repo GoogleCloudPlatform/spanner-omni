@@ -1,0 +1,160 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Monitoring Node Placement Tests
+templates:
+  - templates/prometheus/deployment.yaml
+  - templates/grafana/grafana.yaml
+  - templates/jaeger/deployment.yaml
+  - templates/prometheus/pushgateway.yaml
+
+tests:
+  - it: should not set nodeSelector, tolerations, or affinity by default
+    set:
+      global:
+        insecureMode: true
+    asserts:
+      - isNull:
+          path: spec.template.spec.nodeSelector
+        template: templates/prometheus/deployment.yaml
+      - isNull:
+          path: spec.template.spec.tolerations
+        template: templates/prometheus/deployment.yaml
+      - isNull:
+          path: spec.template.spec.affinity
+        template: templates/prometheus/deployment.yaml
+      - isNull:
+          path: spec.template.spec.nodeSelector
+        documentIndex: 1
+        template: templates/grafana/grafana.yaml
+      - isNull:
+          path: spec.template.spec.tolerations
+        documentIndex: 1
+        template: templates/grafana/grafana.yaml
+      - isNull:
+          path: spec.template.spec.affinity
+        documentIndex: 1
+        template: templates/grafana/grafana.yaml
+      - isNull:
+          path: spec.template.spec.nodeSelector
+        template: templates/jaeger/deployment.yaml
+      - isNull:
+          path: spec.template.spec.tolerations
+        template: templates/jaeger/deployment.yaml
+      - isNull:
+          path: spec.template.spec.affinity
+        template: templates/jaeger/deployment.yaml
+
+  - it: should apply global nodeSelector, tolerations, and affinity across all monitoring components
+    set:
+      global:
+        insecureMode: true
+      nodeSelector:
+        cloud.google.com/gke-nodepool: monitoring-pool
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: monitoring
+          effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector["cloud.google.com/gke-nodepool"]
+          value: monitoring-pool
+        template: templates/prometheus/deployment.yaml
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: dedicated
+        template: templates/prometheus/deployment.yaml
+      - isNotNull:
+          path: spec.template.spec.affinity.nodeAffinity
+        template: templates/prometheus/deployment.yaml
+      - equal:
+          path: spec.template.spec.nodeSelector["cloud.google.com/gke-nodepool"]
+          value: monitoring-pool
+        documentIndex: 1
+        template: templates/grafana/grafana.yaml
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: dedicated
+        documentIndex: 1
+        template: templates/grafana/grafana.yaml
+      - isNotNull:
+          path: spec.template.spec.affinity.nodeAffinity
+        documentIndex: 1
+        template: templates/grafana/grafana.yaml
+      - equal:
+          path: spec.template.spec.nodeSelector["cloud.google.com/gke-nodepool"]
+          value: monitoring-pool
+        template: templates/jaeger/deployment.yaml
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: dedicated
+        template: templates/jaeger/deployment.yaml
+      - isNotNull:
+          path: spec.template.spec.affinity.nodeAffinity
+        template: templates/jaeger/deployment.yaml
+
+  - it: should allow component-specific nodeSelector overrides
+    set:
+      global:
+        insecureMode: true
+      nodeSelector:
+        cloud.google.com/gke-nodepool: default-monitoring-pool
+      prometheus:
+        nodeSelector:
+          cloud.google.com/gke-nodepool: prometheus-dedicated-pool
+      grafana:
+        nodeSelector:
+          cloud.google.com/gke-nodepool: grafana-dedicated-pool
+      jaeger:
+        nodeSelector:
+          cloud.google.com/gke-nodepool: jaeger-dedicated-pool
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector["cloud.google.com/gke-nodepool"]
+          value: prometheus-dedicated-pool
+        template: templates/prometheus/deployment.yaml
+      - equal:
+          path: spec.template.spec.nodeSelector["cloud.google.com/gke-nodepool"]
+          value: grafana-dedicated-pool
+        documentIndex: 1
+        template: templates/grafana/grafana.yaml
+      - equal:
+          path: spec.template.spec.nodeSelector["cloud.google.com/gke-nodepool"]
+          value: jaeger-dedicated-pool
+        template: templates/jaeger/deployment.yaml
+
+  - it: should apply nodeSelector to pushgateway when enabled
+    set:
+      global:
+        insecureMode: true
+      nodeSelector:
+        cloud.google.com/gke-nodepool: monitoring-pool
+      prometheus:
+        enablePushgateway: true
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector["cloud.google.com/gke-nodepool"]
+          value: monitoring-pool
+        documentIndex: 0
+        template: templates/prometheus/pushgateway.yaml
