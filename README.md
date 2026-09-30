@@ -1,4 +1,4 @@
-# Spanner
+# Spanner Omni
 
 This repository provides Helm charts, sample configurations, and operational scripts for deploying and operating [**Spanner Omni**](https://docs.cloud.google.com/spanner-omni) on Kubernetes.
 
@@ -355,7 +355,7 @@ Creation of `StorageClass` objects is automatically enabled when platform templa
 ## Repository Structure
 
 ```text
-spanner/
+spanner-omni/
 ├── SpannerOmni/
 │   ├── helm/
 │   │   ├── Chart.yaml                  # Main Spanner Omni Helm chart definition
