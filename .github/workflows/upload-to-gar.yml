@@ -1,0 +1,61 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Upload Helm Chart to GAR
+
+on:
+# zizmor: ignore[dangerous-triggers] - {Runs only on main branch, safe from PR forks}
+  workflow_run:
+    workflows: ["Helm Validations"]
+    branches: ["main"]
+    types: [completed]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  upload_to_gar:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          persist-credentials: false
+
+      - name: Package Helm Chart
+        run: |
+          BASE_VERSION=$(helm show chart SpannerOmni/helm | grep "^version:" | awk '{print $2}')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE=$(date +'%Y%m%d')
+          NEW_VERSION="${BASE_VERSION}-${DATE}-${SHORT_SHA}"
+          echo "Packaging with dynamic version: $NEW_VERSION"
+          helm package SpannerOmni/helm --version "$NEW_VERSION"
+
+      - name: Google Auth
+        uses: google-github-actions/auth@71fee32a0bb7e97b4d33d548e7d957010649d8fa # v2.1.3
+        with:
+          credentials_json: ${{ secrets.GCP_OUTBOUND_FLIGHT_ACCESS }}
+
+      - name: Authenticate to GAR and Push
+        run: |
+          CHART_PACKAGE=$(ls spanner-omni-*.tgz | head -n 1)
+          echo "Found packaged chart: $CHART_PACKAGE"
+          gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin https://us-west1-docker.pkg.dev
+          helm push $CHART_PACKAGE oci://us-west1-docker.pkg.dev/outbound-flight/spanner-box/helm-charts
+          # Extract version and add 'latest' tag
+          CHART_VERSION=$(helm show chart $CHART_PACKAGE | grep "^version:" | awk '{print $2}')
+          echo "Tagging chart version $CHART_VERSION as latest"
+          gcloud artifacts docker tags add us-west1-docker.pkg.dev/outbound-flight/spanner-box/helm-charts/spanner-omni:$CHART_VERSION us-west1-docker.pkg.dev/outbound-flight/spanner-box/helm-charts/spanner-omni:latest
