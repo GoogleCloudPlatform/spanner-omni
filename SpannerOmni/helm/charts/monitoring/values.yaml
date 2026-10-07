@@ -71,6 +71,11 @@ jaeger:
   resources:
     cpu: "2"
     memory: "4Gi"
+    # Optional memory limit, e.g. "6Gi". Empty means no limit.
+    memoryLimit: ""
+  # Optional GOMEMLIMIT, e.g. "4800MiB". Set it to about 80% of
+  # resources.memoryLimit so Go collects garbage before reaching the limit.
+  goMemLimit: ""
   storage:
     className: ""
     size: "10Gi"
