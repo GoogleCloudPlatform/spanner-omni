@@ -226,6 +226,28 @@ tests:
             readOnly: true
         template: spanner_statefulset.yaml
 
+  - it: should mount the wrapper-key secret at /spanner/kms
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: wrapper-key
+            mountPath: /spanner/kms
+            readOnly: true
+        template: spanner_statefulset.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wrapper-key
+            secret:
+              secretName: wrapper-key
+              optional: true
+              defaultMode: 256
+              items:
+                - key: wrapper_key
+                  path: wrapper_key
+        template: spanner_statefulset.yaml
+
   - it: should use default storage class when no platform is set
     asserts:
       - isNull:

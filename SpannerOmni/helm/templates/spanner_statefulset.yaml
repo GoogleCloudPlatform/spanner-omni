@@ -271,6 +271,9 @@ spec:
         - name: tls-certs
           mountPath: "/spanner/tls"
           readOnly: true
+        - name: wrapper-key
+          mountPath: "/spanner/kms"
+          readOnly: true
         - name: spanner-license-key
           mountPath: "/spanner/license"
           readOnly: true
@@ -301,6 +304,18 @@ spec:
             secretName: tls-certs
             optional: true
             defaultMode: 256
+        # Wrapper keyset (KEK) that encrypts internal keys (such as token
+        # encryption and signing keys) in the system catalog. The server reads
+        # it from /spanner/kms/wrapper_key. Optional: if the secret is absent,
+        # the server falls back to a built-in insecure key.
+        - name: wrapper-key
+          secret:
+            secretName: wrapper-key
+            optional: true
+            defaultMode: 256
+            items:
+              - key: wrapper_key
+                path: wrapper_key
         - name: spanner-license-key
           secret:
             secretName: spanner-license-key
