@@ -553,6 +553,27 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].volumeMounts
           content:
+            name: wrapper-key
+            mountPath: /spanner/kms
+            readOnly: true
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wrapper-key
+            secret:
+              secretName: wrapper-key
+              optional: true
+              defaultMode: 256
+              items:
+                - key: wrapper_key
+                  path: wrapper_key
+        documentIndex: 1
+        template: worker-statefulset.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
             name: spanner-license-key
             mountPath: /spanner/license
             readOnly: true
