@@ -64,6 +64,10 @@ spec:
               value: "/badger/data"
             - name: BADGER_DIRECTORY_KEY
               value: "/badger/key"
+            {{- with $.Values.jaeger.goMemLimit }}
+            - name: GOMEMLIMIT
+              value: {{ . | quote }}
+            {{- end }}
           ports:
             - containerPort: {{ $.Values.jaeger.ports.otlpGrpc }} # gRPC collection
             - containerPort: {{ $.Values.jaeger.ports.otlpHttp }} # HTTP collection
@@ -83,6 +87,10 @@ spec:
             requests:
               cpu: {{ $.Values.jaeger.resources.cpu | quote }}
               memory: {{ $.Values.jaeger.resources.memory | quote }}
+            {{- with $.Values.jaeger.resources.memoryLimit }}
+            limits:
+              memory: {{ . | quote }}
+            {{- end }}
           volumeMounts:
             - name: jaeger-pvc
               mountPath: /badger

@@ -183,8 +183,14 @@
             },
             "memory": {
               "type": "string"
+            },
+            "memoryLimit": {
+              "type": "string"
             }
           }
+        },
+        "goMemLimit": {
+          "type": "string"
         },
         "storage": {
           "type": "object",
