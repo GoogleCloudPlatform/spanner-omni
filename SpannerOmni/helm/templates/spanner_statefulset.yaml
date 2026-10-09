@@ -158,13 +158,25 @@ spec:
                 - -c
                 - |
                   if [ ! -f /spanner/data/spanhostfs/vm_id ] && [ -f /etc/spanner-config/deployment_config.yaml ]; then
+                    {{- if $.Values.deployment.adminPasswordSecret }}
+                    # `deployment create` requires the admin password file to be readable by its
+                    # owner only (0600). The mounted Secret is group-readable (0640) here because
+                    # the pod's fsGroup (set for the data volume) also applies to Secret volumes,
+                    # so copy it to a private 0600 file first. The bootstrap Job
+                    # (create-deployment.yaml) reads the mount directly because it has no fsGroup.
+                    cp /etc/admin-password/password /spanner/.admin-password
+                    chmod 600 /spanner/.admin-password
+                    {{- end }}
                     /google/spanner/bin/spanner deployment create \
                       --base-dir=/spanner \
                       --config-file=/etc/spanner-config/deployment_config.yaml \
                       {{- if $.Values.deployment.adminPasswordSecret }}
-                      --admin-password-file=/etc/admin-password/password \
+                      --admin-password-file=/spanner/.admin-password \
                       {{- end }}
                       --server-health-check-timeout=60s > /spanner/deployment_create.log 2>&1
+                    {{- if $.Values.deployment.adminPasswordSecret }}
+                    rm -f /spanner/.admin-password
+                    {{- end }}
                   fi
         {{- end }}
         name: spanner
