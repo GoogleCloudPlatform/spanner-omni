@@ -50,7 +50,7 @@ Deploy a lightweight, single-pod Spanner Omni instance (`deployment.singleServer
 kubectl create namespace monitoring
 
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   -f SpannerOmni/samples/helm/values-single-server.yaml \
   --set monitoring.enabled=true \
   --namespace spanner-ns \
@@ -68,7 +68,7 @@ To deploy a native multi-server Spanner instance restricted to **one zone** (no 
 kubectl create namespace monitoring
 
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   --set global.platform=gke \
   --set deployment.replicasPerZone=2 \
   --set deployment.rootServersPerZone=1 \
@@ -88,7 +88,7 @@ kubectl create namespace monitoring
 
 # Regional deployment (3 zones, 1 server per zone)
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   -f SpannerOmni/samples/helm/values-regional.yaml \
   --set-json 'extraEnvVars=[{"name":"SPANNER_ROOT_SERVERS_COUNT","value":"1"}]' \
   --set monitoring.enabled=true \
@@ -97,7 +97,7 @@ helm upgrade --install spanner-omni \
 
 # Or Scaleout HA deployment (3 zones, 5 servers & 3 root servers per zone)
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   -f SpannerOmni/samples/helm/values-scaleout.yaml \
   --set monitoring.enabled=true \
   --namespace spanner-ns \
@@ -124,7 +124,7 @@ kubectl create namespace monitoring --context ctx-usw1
 
 # 1. Install chart in us-west1 (with monitoring enabled)
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   -f SpannerOmni/samples/helm/values-multi-region.yaml \
   --namespace spanner-ns-usw1 \
   --set currentLocation=us-west1 \
@@ -134,7 +134,7 @@ helm upgrade --install spanner-omni \
 
 # 2. Install chart in us-west2
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   -f SpannerOmni/samples/helm/values-multi-region.yaml \
   --namespace spanner-ns-usw2 \
   --set currentLocation=us-west2 \
@@ -143,7 +143,7 @@ helm upgrade --install spanner-omni \
 
 # 3. Install chart in us-west3
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   -f SpannerOmni/samples/helm/values-multi-region.yaml \
   --namespace spanner-ns-usw3 \
   --set currentLocation=us-west3 \
@@ -159,7 +159,7 @@ For a **Multi-Cloud** deployment across Amazon EKS (`us-east-1`) and Google Kube
 ```bash
 # 1. Install chart on Amazon EKS cluster (us-east-1)
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   -f SpannerOmni/samples/helm/values-multi-cloud.yaml \
   --namespace spanner-ns-use1 \
   --set global.platform=eks \
@@ -169,7 +169,7 @@ helm upgrade --install spanner-omni \
 
 # 2. Install chart on GKE cluster (us-central1)
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   -f SpannerOmni/samples/helm/values-multi-cloud.yaml \
   --namespace spanner-ns-usc1 \
   --set global.platform=gke \
@@ -259,7 +259,7 @@ Example installation command with TLS, mTLS, and custom admin password enabled:
 
 ```bash
 helm upgrade --install spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
   --set global.platform=gke \
   --set global.insecureMode=false \
   --set deployment.enableClientCertificateAuthentication=true \
@@ -281,8 +281,8 @@ For multi-server deployments (`deployment.singleServer=false`), `helm upgrade` a
 
 ```bash
 helm upgrade spanner-omni \
-  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
-  -n spanner-ns --reuse-values --set image.tag=2026.r4-lts --timeout 30m
+  oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
+  -n spanner-ns --reuse-values --set image.tag=2026.r5 --timeout 30m
 ```
 
 Monitor the staggered rollout job progress:
@@ -298,15 +298,15 @@ In single-server mode (`deployment.singleServer=true`), Spanner binds internal s
 1. **Run Prepare Phase via Ephemeral Debug Container**:
    ```bash
    kubectl debug pod/spanner-a-0 -n spanner-ns \
-     --image=us-docker.pkg.dev/spanner-omni/images/spanner-omni-server:2026.r4-lts \
+     --image=us-docker.pkg.dev/spanner-omni/images/spanner-omni-server:2026.r5 \
      --container=upgrade-prepare -i \
      -- /google/spanner/bin/spanner_server prepare_for_upgrade --root_server=127.0.0.1
    ```
 2. **Run Binary Phase via Helm**:
    ```bash
    helm upgrade spanner-omni \
-     oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
-     -n spanner-ns --reuse-values --set image.tag=2026.r4-lts --timeout 30m
+     oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
+     -n spanner-ns --reuse-values --set image.tag=2026.r5 --timeout 30m
    ```
 
 ### Tracking Rollout Status & Progressing Phases
@@ -356,7 +356,7 @@ You can customize `spanner.cfg` using one of two **mutually exclusive** options:
    - Or from a local file at install/upgrade time:
      ```bash
      helm upgrade --install spanner-omni \
-       oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.0.0 \
+       oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.1.0 \
        --set-file deployment.spannerConfig=path/to/local/spanner.cfg \
        --namespace spanner-ns \
        --create-namespace
