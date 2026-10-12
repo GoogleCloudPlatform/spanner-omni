@@ -268,6 +268,10 @@ tests:
         insecureMode: false
     asserts:
       - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 2000
+        documentIndex: 0
+      - equal:
           path: spec.template.spec.containers[0].args
           value:
             - "--ca-certificate-file=/spanner/tls/ca-api.crt"
@@ -293,5 +297,8 @@ tests:
                 secretName: tls-certs
                 optional: true
                 defaultMode: 256
+                items:
+                  - key: ca-api.crt
+                    path: ca-api.crt
         documentIndex: 0
 

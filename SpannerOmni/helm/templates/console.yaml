@@ -52,8 +52,7 @@ spec:
       {{- end }}
       {{- if $.Values.securityContext }}
       securityContext:
-        fsGroup: 2000
-        {{- toYaml $.Values.securityContext.pod | nindent 8 }}
+        {{- toYaml (merge (dict) ($.Values.securityContext.pod | default dict) (dict "fsGroup" 2000)) | nindent 8 }}
       {{- end }}
       topologySpreadConstraints:
         - maxSkew: 1
@@ -100,6 +99,9 @@ spec:
           secretName: tls-certs
           optional: true
           defaultMode: 256
+          items:
+          - key: ca-api.crt
+            path: ca-api.crt
       {{- end }}
 ---
 apiVersion: v1
