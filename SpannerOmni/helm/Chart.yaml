@@ -16,11 +16,11 @@ apiVersion: v2
 name: spanner-omni
 description: A Helm chart for deploying Spanner Omni.
 type: application
-version: 1.0.0
-appVersion: "2026.r4-lts"
+version: 1.1.0
+appVersion: "2026.r5"
 
 dependencies:
   - name: monitoring
-    version: "1.0.0"
+    version: "1.1.0"
     repository: "file://charts/monitoring"
     condition: monitoring.enabled
