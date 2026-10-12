@@ -228,7 +228,7 @@ ns=spanner-ns
 spanner certificates create-ca --ca-certificate-directory=certs --overwrite
 cp certs/ca.crt certs/ca-api.crt
 spanner certificates create-server --hostnames=*.pod.$ns --ca-certificate-directory certs --output-directory certs
-endpoint="spanner.$ns.svc"
+endpoint="spanner.$ns,spanner.$ns.svc"
 spanner certificates create-server --filename-prefix=api --hostnames=${endpoint} --ca-certificate-directory certs --output-directory certs
 USERNAME=admin
 spanner certificates create-client $USERNAME --output-directory clientcerts --ca-certificate-directory certs --generate-pkcs8-key
@@ -248,6 +248,7 @@ kubectl create secret generic tls-certs \
 - `global.insecureMode=false`: Disables insecure mode and enables TLS.
 - `deployment.enableClientCertificateAuthentication=true`: Enables client certificate authentication (mTLS).
 - `deployment.enablePasswordAuthentication=true`: Enables password authentication (enabled by default).
+- `console.enabled=true`: *(Optional)* Enables the Spanner Omni web console in secure mode (disabled by default when `global.insecureMode=false`; requires `deployment.enablePasswordAuthentication=true`).
 - `deployment.adminPasswordSecret`: Name of a pre-created Kubernetes Secret containing the initial `admin` user password under the `password` key (8–32 characters, including uppercase, lowercase, number, and special character):
   ```bash
   kubectl create secret generic spanner-admin-password \

@@ -96,11 +96,11 @@ console:
   # Resource requests and limits for the interactive console web service
   resources:
     requests:
-      cpu: "20m"
-      memory: "256Mi"
-    limits:
       cpu: "100m"
       memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
 
 # Resource requests and limits for the Spanner container.
 resources:

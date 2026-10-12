@@ -242,3 +242,63 @@ tests:
           path: spec.template.spec.containers[0].ports[0].containerPort
           value: 15026
         documentIndex: 0
+
+  - it: should not configure TLS args or volumes when insecureMode is true
+    set:
+      console:
+        enabled: true
+      global:
+        insecureMode: true
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].args
+        documentIndex: 0
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+        documentIndex: 0
+      - isNull:
+          path: spec.template.spec.volumes
+        documentIndex: 0
+
+  - it: should configure CA certificate flag and tls-certs volume when insecureMode is false
+    set:
+      console:
+        enabled: true
+      global:
+        insecureMode: false
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 2000
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value:
+            - "--ca-certificate-file=/spanner/tls/ca-api.crt"
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].env[0]
+          value:
+            name: SPANNER_HOST
+            value: "spanner.NAMESPACE"
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts
+          value:
+            - name: tls-certs
+              mountPath: "/spanner/tls"
+              readOnly: true
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: tls-certs
+              secret:
+                secretName: tls-certs
+                optional: true
+                defaultMode: 256
+                items:
+                  - key: ca-api.crt
+                    path: ca-api.crt
+        documentIndex: 0
+

@@ -93,12 +93,6 @@ If any assertion fails, Helm will immediately abort the installation/upgrade.
 {{- end }}
 {{- end }}
 
-{{/* Validate that Console is only enabled for insecure deployments */}}
-{{- if and (hasKey $.Values.console "enabled") (eq $.Values.console.enabled true) }}
-{{- if not $.Values.global.insecureMode }}
-  {{- fail "\n\n[FATAL] Console is currently supported only with insecure deployments\n" }}
-{{- end }}
-{{- end }}
 
 {{/* Validate that both featureFlagsConfigMap and spannerConfig are not provided at the same time */}}
 {{- if and $.Values.deployment.featureFlagsConfigMap $.Values.deployment.spannerConfig }}
@@ -109,6 +103,9 @@ If any assertion fails, Helm will immediately abort the installation/upgrade.
 {{- if not $.Values.global.insecureMode }}
 {{- if and (not $.Values.deployment.enableClientCertificateAuthentication) (not $.Values.deployment.enablePasswordAuthentication) }}
   {{- fail "\n\n[FATAL] Secure mode is enabled (global.insecureMode=false), but both client certificate and password authentication are disabled! Please enable at least one authentication method (deployment.enableClientCertificateAuthentication or deployment.enablePasswordAuthentication).\n" }}
+{{- end }}
+{{- if and $.Values.console.enabled (not $.Values.deployment.enablePasswordAuthentication) }}
+  {{- fail "\n\n[FATAL] Spanner UI (console.enabled=true) requires password authentication (deployment.enablePasswordAuthentication=true) when secure mode is enabled (global.insecureMode=false)!\n" }}
 {{- end }}
 {{- end }}
 
