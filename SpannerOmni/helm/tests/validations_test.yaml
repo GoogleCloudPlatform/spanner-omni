@@ -173,15 +173,30 @@ tests:
       - failedTemplate:
           errorPattern: "(?i).*Root server 'spanner-a-rt-0.pod.ns1' is duplicated across multiple zones!.*"
 
-  - it: should fail if console.enabled is explicitly true while insecureMode is false
+  - it: should pass validation if console.enabled is explicitly true while insecureMode is false and password auth is enabled
     set:
       console:
         enabled: true
       global:
         insecureMode: false
+      deployment:
+        enablePasswordAuthentication: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should fail if console.enabled is true while insecureMode is false and password auth is disabled
+    set:
+      console:
+        enabled: true
+      global:
+        insecureMode: false
+      deployment:
+        enableClientCertificateAuthentication: true
+        enablePasswordAuthentication: false
     asserts:
       - failedTemplate:
-          errorPattern: ".*Console is currently supported only with insecure deployments.*"
+          errorPattern: ".*Spanner UI.*requires password authentication.*when secure mode is enabled.*"
 
   - it: should fail if a zone has an even number of root servers
     set:
