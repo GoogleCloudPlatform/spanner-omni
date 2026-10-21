@@ -37,6 +37,12 @@ tests:
       - matchRegex:
           path: data["prometheus.yml"]
           pattern: "regex: 'localhost:\\(\\.\\*\\)'"
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "job_name: 'kubernetes-pods'"
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "__meta_kubernetes_pod_annotation_prometheus_io_scrape"
 
   - it: should use http when global.insecureMode is true
     set:
@@ -58,3 +64,9 @@ tests:
       - matchRegex:
           path: data["prometheus.yml"]
           pattern: "regex: 'localhost:\\(\\.\\*\\)'"
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "job_name: 'kubernetes-pods'"
+      - matchRegex:
+          path: data["prometheus.yml"]
+          pattern: "__meta_kubernetes_pod_annotation_prometheus_io_scrape"
