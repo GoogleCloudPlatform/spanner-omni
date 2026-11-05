@@ -50,7 +50,7 @@ jobs:
 
       - name: "Run Helm Unittest"
         run: |
-          helm plugin install https://github.com/helm-unittest/helm-unittest.git
+          helm plugin install --verify=false https://github.com/helm-unittest/helm-unittest.git
           helm unittest SpannerOmni/helm --with-subchart=false
           helm unittest SpannerOmni/helm/charts/monitoring
 
