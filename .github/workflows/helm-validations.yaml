@@ -42,11 +42,17 @@ jobs:
         run: |
           helm lint SpannerOmni/helm
           helm lint SpannerOmni/helm --set monitoring.enabled=true
+          helm lint SpannerOmni/helm --set global.insecureMode=false --set deployment.adminPasswordSecret=spanner-admin-password
 
       - name: "Run Helm Template"
         run: |
           helm template SpannerOmni/helm
           helm template SpannerOmni/helm --set monitoring.enabled=true
+          if helm template SpannerOmni/helm --set global.insecureMode=false >/dev/null 2>&1; then
+            echo "Expected helm template in secure mode without deployment.adminPasswordSecret to fail"
+            exit 1
+          fi
+          helm template SpannerOmni/helm --set global.insecureMode=false --set deployment.adminPasswordSecret=spanner-admin-password
 
       - name: "Run Helm Unittest"
         run: |
@@ -67,6 +73,7 @@ jobs:
         run: |
           helm template SpannerOmni/helm | kubeconform -strict -summary
           helm template SpannerOmni/helm --set monitoring.enabled=true | kubeconform -strict -summary
+          helm template SpannerOmni/helm --set global.insecureMode=false --set deployment.adminPasswordSecret=spanner-admin-password | kubeconform -strict -summary
 
       - name: "Run Helm Template & Validate with Kubeconform for all platforms"
         run: |
