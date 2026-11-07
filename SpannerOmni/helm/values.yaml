@@ -180,7 +180,7 @@ deployment:
   # Enable password authentication for Spanner deployment. Defaults to true.
   enablePasswordAuthentication: true
   # Name of a pre-created Kubernetes Secret containing the admin password under the "password" key.
-  # Optional (uses Spanner's default password if omitted), but highly recommended for security reasons.
+  # Required when creating a deployment in secure mode (on initial install with global.insecureMode=false, including client-certificate-only deployments).
   # Note: This Secret MUST reside in the same namespace as the deployment.
   adminPasswordSecret: ""
   # Tracer endpoint (e.g., endpoint for Jaeger collector). Defaults to "" (disabled).

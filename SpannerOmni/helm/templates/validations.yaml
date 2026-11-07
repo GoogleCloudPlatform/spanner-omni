@@ -99,6 +99,13 @@ If any assertion fails, Helm will immediately abort the installation/upgrade.
   {{- fail "\n\n[FATAL] Both 'deployment.featureFlagsConfigMap' and 'deployment.spannerConfig' cannot be set simultaneously! Please choose either Option 1 (inline/external config values via 'spannerConfig') OR Option 2 (referencing a pre-created ConfigMap via 'featureFlagsConfigMap').\n" }}
 {{- end }}
 
+{{/* Validate that an admin password secret is provided when creating a deployment in secure mode */}}
+{{- if and $.Release.IsInstall (not $.Values.global.insecureMode) }}
+{{- if empty $.Values.deployment.adminPasswordSecret }}
+  {{- fail "\n\n[FATAL] An admin password secret is required when creating a deployment in secure mode (global.insecureMode=false)! Please create a Kubernetes Secret containing the admin password under the 'password' key and set 'deployment.adminPasswordSecret'.\n" }}
+{{- end }}
+{{- end }}
+
 {{/* Validate that at least one authentication method is enabled when insecureMode is false */}}
 {{- if not $.Values.global.insecureMode }}
 {{- if and (not $.Values.deployment.enableClientCertificateAuthentication) (not $.Values.deployment.enablePasswordAuthentication) }}

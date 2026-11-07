@@ -249,7 +249,7 @@ kubectl create secret generic tls-certs \
 - `deployment.enableClientCertificateAuthentication=true`: Enables client certificate authentication (mTLS).
 - `deployment.enablePasswordAuthentication=true`: Enables password authentication (enabled by default).
 - `console.enabled=true`: *(Optional)* Enables the Spanner Omni web console in secure mode (disabled by default when `global.insecureMode=false`; requires `deployment.enablePasswordAuthentication=true`).
-- `deployment.adminPasswordSecret`: Name of a pre-created Kubernetes Secret containing the initial `admin` user password under the `password` key (8–32 characters, including uppercase, lowercase, number, and special character):
+- `deployment.adminPasswordSecret`: *(Required on initial install when `global.insecureMode=false`, including client-certificate-only deployments)* Name of a pre-created Kubernetes Secret containing the initial `admin` user password under the `password` key (8–32 characters, including uppercase, lowercase, number, and special character):
   ```bash
   kubectl create secret generic spanner-admin-password \
     --from-file=password=/path/to/password.txt \
