@@ -160,3 +160,57 @@ tests:
           path: spec.template.spec.containers[0].imagePullPolicy
           value: Always
         template: rollout-job.yaml
+
+  - it: should configure non-root securityContext, mount /tmp emptyDir with HOME=/tmp, and preserve service account token automount for kubectl
+    set:
+      rollout:
+        staggered: true
+      deployment:
+        singleServer: false
+      locations:
+        - name: "test-location"
+          zones:
+            - name: "test-zone-a"
+            - name: "test-zone-b"
+    release:
+      upgrade: true
+    asserts:
+      - isNull:
+          path: spec.template.spec.automountServiceAccountToken
+        template: rollout-job.yaml
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+        template: rollout-job.yaml
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+        template: rollout-job.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HOME
+            value: /tmp
+        template: rollout-job.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp-volume
+            mountPath: /tmp
+        template: rollout-job.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp-volume
+            emptyDir: {}
+        template: rollout-job.yaml

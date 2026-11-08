@@ -36,6 +36,10 @@ spec:
       imagePullSecrets:
       - name: {{ .Values.rollout.image.pullSecret }}
       {{- end }}
+      {{- if .Values.securityContext }}
+      securityContext:
+        {{- toYaml .Values.securityContext.pod | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -50,8 +54,18 @@ spec:
         {{- if .Values.rollout.image.pullPolicy }}
         imagePullPolicy: {{ .Values.rollout.image.pullPolicy }}
         {{- end }}
+        {{- if .Values.securityContext }}
+        securityContext:
+          {{- toYaml .Values.securityContext.container | nindent 10 }}
+        {{- end }}
         resources:
           {{- toYaml .Values.jobs.resources | nindent 10 }}
+        env:
+        - name: HOME
+          value: /tmp
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
         command: ["/bin/bash", "-c"]
         args:
         - |
@@ -98,4 +112,7 @@ spec:
             fi
           done
           echo "Rollout completed for all StatefulSets..."
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}
 {{- end }}

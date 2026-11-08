@@ -84,3 +84,42 @@ tests:
           path: spec.template.spec.containers[0].resources.limits.cpu
           value: 200m
         template: prepare-upgrade-job.yaml
+
+  - it: should configure non-root securityContext, disable service account token automount, and mount /tmp emptyDir
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+        template: prepare-upgrade-job.yaml
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            fsGroup: 2000
+            fsGroupChangePolicy: OnRootMismatch
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+        template: prepare-upgrade-job.yaml
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+        template: prepare-upgrade-job.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: tmp-volume
+            mountPath: /tmp
+        template: prepare-upgrade-job.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp-volume
+            emptyDir: {}
+        template: prepare-upgrade-job.yaml
