@@ -15,8 +15,6 @@
 suite: Spanner Bootstrap Job Tests
 templates:
   - create-deployment.yaml
-  - spanner_statefulset.yaml
-  - spanner-config.yaml
 
 tests:
   - it: should render the bootstrap job by default
@@ -30,7 +28,10 @@ tests:
   # initial sys_root.BoxKeys rows. It wraps them with whatever keyset it finds
   # at /spanner/kms/wrapper_key, and silently falls back to a built-in insecure
   # key when nothing is there, so the bootstrap pod needs the same mount the
-  # servers get.
+  # servers get. Keys wrapped with one keyset cannot be unwrapped by servers
+  # holding another, so the projection below must stay identical to the two
+  # other consumers, pinned in spanner_statefulset_test.yaml and
+  # worker_statefulset_test.yaml.
   - it: should mount the wrapper key at /spanner/kms in the bootstrap job
     asserts:
       - contains:
@@ -55,28 +56,3 @@ tests:
                 - key: wrapper_key
                   path: wrapper_key
         template: create-deployment.yaml
-
-  # Both pods must agree about the keyset: keys the bootstrap server wraps with
-  # one key cannot be unwrapped by servers holding another. These two asserts
-  # pin the identical projection on both sides.
-  - it: should project the wrapper key identically in the StatefulSet
-    asserts:
-      - contains:
-          path: spec.template.spec.volumes
-          content:
-            name: wrapper-key
-            secret:
-              secretName: wrapper-key
-              optional: true
-              defaultMode: 256
-              items:
-                - key: wrapper_key
-                  path: wrapper_key
-        template: spanner_statefulset.yaml
-      - contains:
-          path: spec.template.spec.containers[0].volumeMounts
-          content:
-            name: wrapper-key
-            mountPath: "/spanner/kms"
-            readOnly: true
-        template: spanner_statefulset.yaml

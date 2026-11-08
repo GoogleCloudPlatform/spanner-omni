@@ -104,10 +104,11 @@ spec:
         # Wrapper keyset (KEK) that encrypts internal keys (such as token
         # encryption and signing keys) in the system catalog. `deployment create`
         # starts a server in-process, and that server is what first writes those
-        # keys, so it must wrap them with the same keyset the StatefulSet servers
-        # later unwrap them with. Without this mount the bootstrap server falls
-        # back to a built-in insecure key and the real servers can never read the
-        # keys back. Kept identical to the StatefulSet projection on purpose.
+        # keys, so it must wrap them with the same keyset the StatefulSet and
+        # worker servers later unwrap them with. Without this mount the bootstrap
+        # server falls back to a built-in insecure key and the real servers can
+        # never read the keys back. This projection is pinned by
+        # tests/create_deployment_test.yaml.
         - name: wrapper-key
           secret:
             secretName: wrapper-key
