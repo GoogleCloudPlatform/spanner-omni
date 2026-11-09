@@ -63,9 +63,16 @@ spec:
       labels:
         {{- include "spanner-omni.labels" $ | nindent 8 }}
     spec:
+      automountServiceAccountToken: false
       {{- if .Values.image.pullSecret }}
       imagePullSecrets:
       - name: {{ .Values.image.pullSecret }}
+      {{- end }}
+      {{- if .Values.securityContext }}
+      securityContext:
+        fsGroup: 2000
+        fsGroupChangePolicy: "OnRootMismatch"
+        {{- toYaml .Values.securityContext.pod | nindent 8 }}
       {{- end }}
       restartPolicy: Never
       {{- with .Values.nodeSelector }}
@@ -82,6 +89,10 @@ spec:
           {{- if .Values.image.pullPolicy }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- end }}
+          {{- if .Values.securityContext }}
+          securityContext:
+            {{- toYaml .Values.securityContext.container | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.jobs.resources | nindent 12 }}
           command: ["/google/spanner/bin/spanner_server"]
@@ -95,6 +106,8 @@ spec:
               readOnly: true
             - name: spanner-data
               mountPath: /spanner
+            - name: tmp-volume
+              mountPath: /tmp
       volumes:
         - name: tls-certs
           secret:
@@ -102,5 +115,7 @@ spec:
             optional: true
             defaultMode: 256
         - name: spanner-data
+          emptyDir: {}
+        - name: tmp-volume
           emptyDir: {}
 {{- end }}

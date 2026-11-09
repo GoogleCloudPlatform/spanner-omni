@@ -44,9 +44,16 @@ spec:
         {{- include "spanner-omni.labels" $ | nindent 8 }}
         app.kubernetes.io/component: bootstrap
     spec:
+      automountServiceAccountToken: false
       {{- if $.Values.image.pullSecret }}
       imagePullSecrets:
       - name: {{ $.Values.image.pullSecret }}
+      {{- end }}
+      {{- if $.Values.securityContext }}
+      securityContext:
+        fsGroup: 2000
+        fsGroupChangePolicy: "OnRootMismatch"
+        {{- toYaml $.Values.securityContext.pod | nindent 8 }}
       {{- end }}
       restartPolicy: OnFailure
       {{- with $.Values.nodeSelector }}
@@ -63,8 +70,30 @@ spec:
           {{- if $.Values.image.pullPolicy }}
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           {{- end }}
+          {{- if $.Values.securityContext }}
+          securityContext:
+            {{- toYaml $.Values.securityContext.container | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml $.Values.jobs.resources | nindent 12 }}
+          {{- if $adminPasswordSecret }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if ! touch /tmp/.admin-password || ! chmod 600 /tmp/.admin-password || ! cat /etc/admin-password/password > /tmp/.admin-password; then
+                rm -f /tmp/.admin-password
+                exit 1
+              fi
+              /google/spanner/bin/spanner deployment create \
+                --base-dir=/spanner \
+                --config-file=/etc/spanner-config/deployment_config.yaml \
+                --server-health-check-timeout=60s \
+                --admin-password-file=/tmp/.admin-password
+              rc=$?
+              rm -f /tmp/.admin-password
+              exit $rc
+          {{- else }}
           command:
             - /google/spanner/bin/spanner
           args:
@@ -73,9 +102,7 @@ spec:
             - --base-dir=/spanner
             - --config-file=/etc/spanner-config/deployment_config.yaml
             - --server-health-check-timeout=60s
-            {{- if $adminPasswordSecret }}
-            - --admin-password-file=/etc/admin-password/password
-            {{- end }}
+          {{- end }}
           volumeMounts:
             - name: deployment-config
               mountPath: /etc/spanner-config
@@ -87,6 +114,8 @@ spec:
               readOnly: true
             - name: spanner-data
               mountPath: /spanner
+            - name: tmp-volume
+              mountPath: /tmp
             {{- if $adminPasswordSecret }}
             - name: admin-password
               mountPath: /etc/admin-password
@@ -118,6 +147,8 @@ spec:
               - key: wrapper_key
                 path: wrapper_key
         - name: spanner-data
+          emptyDir: {}
+        - name: tmp-volume
           emptyDir: {}
         {{- if $adminPasswordSecret }}
         - name: admin-password

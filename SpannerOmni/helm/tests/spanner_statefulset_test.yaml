@@ -1200,4 +1200,22 @@ tests:
           value: "tmp-volume"
         template: spanner_statefulset.yaml
 
+  - it: should fail fast and clean up partial bootstrap state when deployment create fails in single-server postStart
+    set:
+      deployment:
+        singleServer: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].lifecycle.postStart.exec.command[2]
+          pattern: "if ! /google/spanner/bin/spanner deployment create"
+        template: spanner_statefulset.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].lifecycle.postStart.exec.command[2]
+          pattern: "rm -rf /tmp/\\.admin-password /spanner/data/\\* /spanner/ls/\\* /spanner/time_server/\\* /spanner/run/\\*"
+        template: spanner_statefulset.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].lifecycle.postStart.exec.command[2]
+          pattern: "exit 1"
+        template: spanner_statefulset.yaml
+
 
