@@ -181,6 +181,7 @@ tests:
         insecureMode: false
       deployment:
         enablePasswordAuthentication: true
+        adminPasswordSecret: "test-admin-password"
     asserts:
       - hasDocuments:
           count: 0
@@ -194,6 +195,7 @@ tests:
       deployment:
         enableClientCertificateAuthentication: true
         enablePasswordAuthentication: false
+        adminPasswordSecret: "test-admin-password"
     asserts:
       - failedTemplate:
           errorPattern: ".*Spanner UI.*requires password authentication.*when secure mode is enabled.*"
@@ -251,6 +253,7 @@ tests:
       deployment:
         enableClientCertificateAuthentication: false
         enablePasswordAuthentication: false
+        adminPasswordSecret: "test-admin-password"
     asserts:
       - failedTemplate:
           errorPattern: ".*Secure mode is enabled.*but both client certificate and password authentication are disabled.*"
@@ -298,12 +301,40 @@ tests:
           count: 0
 
 
-  - it: should pass validation in singleServer mode when insecureMode is false and adminPasswordSecret is omitted
+  - it: should fail validation in singleServer mode when insecureMode is false and adminPasswordSecret is omitted
     set:
       deployment:
         singleServer: true
       global:
         insecureMode: false
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*An admin password secret is required when creating a deployment in secure mode.*"
+
+  - it: should pass validation in multi-server insecure mode when adminPasswordSecret is omitted
+    set:
+      deployment:
+        singleServer: false
+      global:
+        insecureMode: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should fail validation in mTLS-only secure mode when adminPasswordSecret is omitted on install
+    set:
+      global:
+        insecureMode: false
+      deployment:
+        enableClientCertificateAuthentication: true
+        enablePasswordAuthentication: false
+    asserts:
+      - failedTemplate:
+          errorPattern: ".*An admin password secret is required when creating a deployment in secure mode.*"
+
+  - it: should pass validation on upgrade when adminPasswordSecret is omitted
+    release:
+      upgrade: true
     asserts:
       - hasDocuments:
           count: 0
