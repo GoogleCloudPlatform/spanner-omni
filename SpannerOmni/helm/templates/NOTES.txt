@@ -1,0 +1,40 @@
+{{- /*
+Copyright 2026 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{- /*
+Non-fatal warnings shown after `helm install` / `helm upgrade`. Fatal checks
+belong in validations.yaml; these must never block an install or upgrade.
+*/}}
+{{- $monitoring := $.Values.monitoring | default dict }}
+{{- $usesBundledJaeger := and $monitoring.enabled (not $.Values.deployment.traceExporterEndpoint) }}
+{{- $jaegerTls := dig "jaeger" "tls" "enabled" false $monitoring }}
+{{- if and (not $.Values.global.insecureMode) $usesBundledJaeger (not $jaegerTls) }}
+[WARNING] Traces will NOT be exported in secure mode!
+Spanner Omni is running in secure mode (global.insecureMode=false) and exports
+traces to the bundled Jaeger (monitoring.enabled=true with an empty
+deployment.traceExporterEndpoint), but Jaeger's OTLP gRPC receiver does not
+serve TLS (monitoring.jaeger.tls.enabled=false). In secure mode, Spanner only
+exports traces to a remote OTLP endpoint over TLS, so all traces are dropped.
+
+To fix this:
+  1. Create a TLS Secret named {{ dig "jaeger" "tls" "secretName" "jaeger-tls" $monitoring | quote }} (keys tls.crt and tls.key) in
+     the {{ $monitoring.namespace | default "monitoring" | quote }} namespace. The certificate's SANs must include
+     jaeger.{{ $monitoring.namespace | default "monitoring" }}.svc.cluster.local.
+  2. Add the CA certificate that signed it to the `tls-certs` Secret in the
+     {{ include "spanner-omni.namespace" . | quote }} namespace under the key `ca-otlp.crt`.
+  3. Upgrade the release with --set monitoring.jaeger.tls.enabled=true.
+  4. Restart the Spanner servers: they only start using `ca-otlp.crt` after a
+     restart if it was added while they were running.
+{{- end }}

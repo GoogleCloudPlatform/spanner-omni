@@ -68,6 +68,16 @@ spec:
             - name: GOMEMLIMIT
               value: {{ . | quote }}
             {{- end }}
+            {{- if $.Values.jaeger.tls.enabled }}
+            # Serve the OTLP gRPC receiver over TLS. In secure mode, Spanner
+            # only exports traces to a remote OTLP endpoint over TLS.
+            - name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+              value: "true"
+            - name: COLLECTOR_OTLP_GRPC_TLS_CERT
+              value: "/jaeger/tls/tls.crt"
+            - name: COLLECTOR_OTLP_GRPC_TLS_KEY
+              value: "/jaeger/tls/tls.key"
+            {{- end }}
           ports:
             - containerPort: {{ $.Values.jaeger.ports.otlpGrpc }} # gRPC collection
             - containerPort: {{ $.Values.jaeger.ports.otlpHttp }} # HTTP collection
@@ -94,6 +104,19 @@ spec:
           volumeMounts:
             - name: jaeger-pvc
               mountPath: /badger
+            {{- if $.Values.jaeger.tls.enabled }}
+            - name: jaeger-tls
+              mountPath: /jaeger/tls
+              readOnly: true
+            {{- end }}
+      {{- if $.Values.jaeger.tls.enabled }}
+      volumes:
+        - name: jaeger-tls
+          secret:
+            secretName: {{ $.Values.jaeger.tls.secretName | default "jaeger-tls" | quote }}
+            # 0440: owned by the pod's fsGroup, which the container runs with.
+            defaultMode: 288
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: jaeger-pvc

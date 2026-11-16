@@ -183,7 +183,9 @@ deployment:
   # Required when creating a deployment in secure mode (on initial install with global.insecureMode=false, including client-certificate-only deployments).
   # Note: This Secret MUST reside in the same namespace as the deployment.
   adminPasswordSecret: ""
-  # Tracer endpoint (e.g., endpoint for Jaeger collector). Defaults to "" (disabled).
+  # Tracer endpoint (e.g., endpoint for Jaeger collector). Defaults to "" (disabled, or the bundled
+  # Jaeger when monitoring.enabled=true). In secure mode, traces are only exported to a remote
+  # endpoint over TLS, verified against `ca-otlp.crt` in the `tls-certs` Secret.
   traceExporterEndpoint: ""
   # Whether to use a single time server. Disables HA timeserver if true. Defaults to false.
   useSingleTimeServer: false
@@ -256,6 +258,19 @@ jobs:
 monitoring:
   # Enable monitoring stack. Defaults to false.
   enabled: false
+  # When enabled and deployment.traceExporterEndpoint is empty, Spanner exports
+  # traces to the bundled Jaeger. In secure mode (global.insecureMode=false),
+  # this requires TLS on Jaeger's OTLP gRPC receiver, otherwise traces are
+  # dropped:
+  #   jaeger:
+  #     tls:
+  #       enabled: true
+  #       # kubernetes.io/tls Secret (tls.crt, tls.key) in the monitoring
+  #       # namespace; SANs must include jaeger.<monitoring namespace>.svc.cluster.local.
+  #       secretName: "jaeger-tls"
+  # and the CA that signed Jaeger's certificate must be added to the
+  # `tls-certs` Secret under the key `ca-otlp.crt`.
+  # See charts/monitoring/values.yaml for details.
 
 # IMPORTANT: DO NOT OVERRIDE BELOW VALUES. Instead, use the same keys without the `defaults.` prefix.
 # defaults section holds the base values for platform-dependent attributes. To override these fields, always use the top-level keys
