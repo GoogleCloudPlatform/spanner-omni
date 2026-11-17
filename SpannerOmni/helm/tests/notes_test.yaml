@@ -17,102 +17,28 @@ templates:
   - NOTES.txt
 
 tests:
-  - it: should warn in secure mode when the bundled Jaeger does not serve TLS
-    release:
-      namespace: spanner-ns
-    set:
-      global:
-        insecureMode: false
-      deployment:
-        adminPasswordSecret: spanner-admin-password
-      monitoring:
-        enabled: true
-    asserts:
-      - matchRegexRaw:
-          pattern: "\\[WARNING\\] Traces may NOT be exported in secure mode!"
-      - matchRegexRaw:
-          pattern: "Starting with Spanner Omni release 2026\\.r6, servers in secure mode only export"
-      - matchRegexRaw:
-          pattern: "Earlier releases still export them in plaintext"
-      - matchRegexRaw:
-          pattern: "monitoring\\.jaeger\\.tls\\.enabled=true"
-      - matchRegexRaw:
-          pattern: "jaeger\\.monitoring\\.svc\\.cluster\\.local"
-      - matchRegexRaw:
-          pattern: "`tls-certs` Secret in the\\s+\"spanner-ns\" namespace under the key `ca-otlp\\.crt`"
-
-  - it: should use the custom monitoring namespace and secret name in the warning
-    set:
-      global:
-        insecureMode: false
-      deployment:
-        adminPasswordSecret: spanner-admin-password
-      monitoring:
-        enabled: true
-        namespace: obs
-        jaeger:
-          tls:
-            secretName: my-jaeger-cert
-    asserts:
-      - matchRegexRaw:
-          pattern: "\"my-jaeger-cert\""
-      - matchRegexRaw:
-          pattern: "jaeger\\.obs\\.svc\\.cluster\\.local"
-
-  - it: should not warn when Jaeger TLS is enabled
-    set:
-      global:
-        insecureMode: false
-      deployment:
-        adminPasswordSecret: spanner-admin-password
-      monitoring:
-        enabled: true
-        jaeger:
-          tls:
-            enabled: true
-    asserts:
-      - notMatchRegexRaw:
-          pattern: "WARNING"
-
-  - it: should not warn in insecure mode
-    set:
-      global:
-        insecureMode: true
-      monitoring:
-        enabled: true
-    asserts:
-      - notMatchRegexRaw:
-          pattern: "WARNING"
-
-  - it: should not warn when monitoring is disabled
-    set:
-      global:
-        insecureMode: false
-      deployment:
-        adminPasswordSecret: spanner-admin-password
-      monitoring:
-        enabled: false
-    asserts:
-      - notMatchRegexRaw:
-          pattern: "WARNING"
-
-  - it: should not warn when a custom trace exporter endpoint is set
-    set:
-      global:
-        insecureMode: false
-      deployment:
-        adminPasswordSecret: spanner-admin-password
-        traceExporterEndpoint: "dns:///otel-collector.example.com:4317"
-      monitoring:
-        enabled: true
-    asserts:
-      - notMatchRegexRaw:
-          pattern: "WARNING"
-
-  - it: should list the TLS requirements whenever the bundled Jaeger serves TLS
+  - it: should list the TLS requirements in secure mode, where Jaeger TLS is on by default
     release:
       name: my-release
       namespace: spanner-ns
+    set:
+      global:
+        insecureMode: false
+      deployment:
+        adminPasswordSecret: spanner-admin-password
+      monitoring:
+        enabled: true
+    asserts:
+      - matchRegexRaw:
+          pattern: "\\[NOTE\\] The bundled Jaeger only accepts traces over TLS"
+      - matchRegexRaw:
+          pattern: "contains `ca-otlp\\.crt`"
+      - matchRegexRaw:
+          pattern: "release 2026\\.r6 or later"
+      - matchRegexRaw:
+          pattern: "kubectl rollout restart statefulset -n spanner-ns -l app\\.kubernetes\\.io/instance=my-release"
+
+  - it: should list the TLS requirements when Jaeger TLS is enabled in insecure mode
     set:
       global:
         insecureMode: true
@@ -124,21 +50,23 @@ tests:
     asserts:
       - matchRegexRaw:
           pattern: "\\[NOTE\\] The bundled Jaeger only accepts traces over TLS"
-      - matchRegexRaw:
-          pattern: "contains `ca-otlp\\.crt`"
-      - matchRegexRaw:
-          pattern: "release 2026\\.r6 or later"
-      - matchRegexRaw:
-          pattern: "kubectl rollout restart statefulset -n spanner-ns -l app\\.kubernetes\\.io/instance=my-release"
-      - notMatchRegexRaw:
-          pattern: "\\[WARNING\\]"
 
-  - it: should not list the TLS requirements when Jaeger doesn't serve TLS
+  - it: should not list the TLS requirements in insecure mode by default
     set:
       global:
         insecureMode: true
       monitoring:
         enabled: true
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "\\[NOTE\\]"
+
+  - it: should not list the TLS requirements when monitoring is disabled
+    set:
+      global:
+        insecureMode: false
+      deployment:
+        adminPasswordSecret: spanner-admin-password
     asserts:
       - notMatchRegexRaw:
           pattern: "\\[NOTE\\]"

@@ -17,10 +17,10 @@ templates:
   - templates/jaeger/deployment.yaml
 
 tests:
-  - it: should not configure TLS by default
+  - it: should not configure TLS by default in insecure mode
     set:
       global:
-        insecureMode: false
+        insecureMode: true
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
@@ -124,3 +124,33 @@ tests:
           content:
             name: COLLECTOR_OTLP_GRPC_TLS_RELOAD_INTERVAL
             value: 10m
+
+  - it: should serve TLS by default in secure mode
+    set:
+      global:
+        insecureMode: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+            value: "true"
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: jaeger-tls
+
+  - it: should not serve TLS when explicitly disabled
+    set:
+      global:
+        insecureMode: false
+      jaeger:
+        tls:
+          enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+          any: true
+      - isNull:
+          path: spec.template.spec.volumes

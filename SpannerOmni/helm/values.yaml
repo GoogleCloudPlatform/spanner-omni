@@ -261,10 +261,11 @@ monitoring:
   # When enabled and deployment.traceExporterEndpoint is empty, Spanner exports
   # traces to the bundled Jaeger. Starting with Spanner Omni 2026.r6, in secure
   # mode (global.insecureMode=false) this requires TLS on Jaeger's OTLP gRPC
-  # receiver, otherwise traces are dropped:
+  # receiver, which is therefore on by default in secure mode (disabling it
+  # there fails the install or upgrade; use chart 1.x with earlier releases):
   #   jaeger:
   #     tls:
-  #       enabled: true
+  #       enabled: null  # default: true in secure mode, false otherwise
   #       # kubernetes.io/tls Secret (tls.crt, tls.key) in the monitoring
   #       # namespace; SANs must include jaeger.<monitoring namespace>.svc.cluster.local.
   #       secretName: "jaeger-tls"

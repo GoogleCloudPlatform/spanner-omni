@@ -13,6 +13,7 @@
 # limitations under the License.
 
 {{- $platformValues := include "monitoring.PlatformValues" . | fromYaml }}
+{{- $jaegerTls := eq (include "monitoring.jaegerTlsEnabled" .) "true" }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -68,7 +69,7 @@ spec:
             - name: GOMEMLIMIT
               value: {{ . | quote }}
             {{- end }}
-            {{- if $.Values.jaeger.tls.enabled }}
+            {{- if $jaegerTls }}
             # Serve the OTLP gRPC receiver over TLS. In secure mode, Spanner
             # only exports traces to a remote OTLP endpoint over TLS.
             - name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
@@ -108,12 +109,12 @@ spec:
           volumeMounts:
             - name: jaeger-pvc
               mountPath: /badger
-            {{- if $.Values.jaeger.tls.enabled }}
+            {{- if $jaegerTls }}
             - name: jaeger-tls
               mountPath: /jaeger/tls
               readOnly: true
             {{- end }}
-      {{- if $.Values.jaeger.tls.enabled }}
+      {{- if $jaegerTls }}
       volumes:
         - name: jaeger-tls
           secret:
