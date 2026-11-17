@@ -128,7 +128,20 @@ returns objects against a live cluster (not for `helm template` or
 `--dry-run=client`), so only check when the monitoring namespace is found.
 */}}
 {{- $monitoring := $.Values.monitoring | default dict }}
-{{- if and $monitoring.enabled (dig "jaeger" "tls" "enabled" false $monitoring) }}
+{{- $jaegerTlsEnabled := dig "jaeger" "tls" "enabled" false $monitoring }}
+
+{{- /*
+In secure mode, Spanner only exports traces to a remote collector over TLS, so
+the bundled Jaeger (used when deployment.traceExporterEndpoint is empty) must
+serve TLS, or every trace is dropped. Enforced on install only, like the admin
+password check, so that upgrading an existing release isn't blocked; upgrades
+get the warning in NOTES.txt instead.
+*/}}
+{{- if and $.Release.IsInstall (not $.Values.global.insecureMode) $monitoring.enabled (not $.Values.deployment.traceExporterEndpoint) (not $jaegerTlsEnabled) }}
+  {{- fail "\n\n[FATAL] Secure mode (global.insecureMode=false) with the bundled Jaeger (monitoring.enabled=true and an empty deployment.traceExporterEndpoint) requires TLS on Jaeger's OTLP gRPC receiver, because Spanner Omni only exports traces to a remote collector over TLS! Create a kubernetes.io/tls Secret for Jaeger in the monitoring namespace, add the CA that issued it to the `tls-certs` Secret as `ca-otlp.crt`, and set monitoring.jaeger.tls.enabled=true (see the README). Alternatively, set deployment.traceExporterEndpoint to your own collector.\n" }}
+{{- end }}
+
+{{- if and $monitoring.enabled $jaegerTlsEnabled }}
   {{- $monNs := $monitoring.namespace | default "monitoring" }}
   {{- $jaegerTlsSecret := dig "jaeger" "tls" "secretName" "jaeger-tls" $monitoring }}
   {{- if lookup "v1" "Namespace" "" $monNs }}
