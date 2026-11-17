@@ -88,8 +88,9 @@ jaeger:
   # certificate against `ca-otlp.crt` in the Spanner `tls-certs` Secret. Without
   # TLS here, traces from secure-mode deployments are dropped. When enabled,
   # `ca-otlp.crt` is required in every mode (without it, Spanner exports in
-  # plaintext, which a TLS receiver rejects). Spanner servers pick up a newly
-  # added `ca-otlp.crt` only after a restart.
+  # plaintext, which a TLS receiver rejects). Requires Spanner Omni 2026.rN or
+  # later; earlier releases only export in plaintext. Spanner servers pick up a
+  # newly added `ca-otlp.crt` only after a restart.
   tls:
     # Serve the OTLP gRPC receiver over TLS. Defaults to false.
     enabled: false
@@ -98,6 +99,9 @@ jaeger:
     # certificate's SANs must include jaeger.<monitoring namespace>.svc.cluster.local.
     # Add the CA that signed it to the Spanner `tls-certs` Secret as `ca-otlp.crt`.
     secretName: "jaeger-tls"
+    # How often Jaeger re-reads the certificate and key from the Secret, so that
+    # rotated certificates are used without a restart. Defaults to "1h".
+    reloadInterval: "1h"
 service:
   type: ""
   annotations: {}

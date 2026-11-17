@@ -68,6 +68,12 @@ tests:
           content:
             name: COLLECTOR_OTLP_GRPC_TLS_KEY
             value: /jaeger/tls/tls.key
+      # Rotated certificates are picked up without a restart.
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_RELOAD_INTERVAL
+            value: 1h
       - contains:
           path: spec.template.spec.containers[0].volumeMounts
           content:
@@ -94,15 +100,22 @@ tests:
             - containerPort: 4318
             - containerPort: 16686
 
-  - it: should use a custom TLS secret name
+  - it: should use a custom TLS secret name and reload interval
     set:
+      # The chart's schema requires `global`.
       global:
-        insecureMode: true
+        insecureMode: false
       jaeger:
         tls:
           enabled: true
           secretName: my-jaeger-cert
+          reloadInterval: 10m
     asserts:
       - equal:
           path: spec.template.spec.volumes[0].secret.secretName
           value: my-jaeger-cert
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_RELOAD_INTERVAL
+            value: 10m

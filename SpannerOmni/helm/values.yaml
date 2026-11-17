@@ -259,9 +259,9 @@ monitoring:
   # Enable monitoring stack. Defaults to false.
   enabled: false
   # When enabled and deployment.traceExporterEndpoint is empty, Spanner exports
-  # traces to the bundled Jaeger. In secure mode (global.insecureMode=false),
-  # this requires TLS on Jaeger's OTLP gRPC receiver, otherwise traces are
-  # dropped:
+  # traces to the bundled Jaeger. Starting with Spanner Omni 2026.rN, in secure
+  # mode (global.insecureMode=false) this requires TLS on Jaeger's OTLP gRPC
+  # receiver, otherwise traces are dropped:
   #   jaeger:
   #     tls:
   #       enabled: true

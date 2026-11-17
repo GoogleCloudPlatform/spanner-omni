@@ -77,6 +77,10 @@ spec:
               value: "/jaeger/tls/tls.crt"
             - name: COLLECTOR_OTLP_GRPC_TLS_KEY
               value: "/jaeger/tls/tls.key"
+            # Re-read the certificate and key periodically, so that a rotated
+            # Secret is picked up without restarting Jaeger.
+            - name: COLLECTOR_OTLP_GRPC_TLS_RELOAD_INTERVAL
+              value: {{ $.Values.jaeger.tls.reloadInterval | default "1h" | quote }}
             {{- end }}
           ports:
             - containerPort: {{ $.Values.jaeger.ports.otlpGrpc }} # gRPC collection
@@ -114,8 +118,10 @@ spec:
         - name: jaeger-tls
           secret:
             secretName: {{ $.Values.jaeger.tls.secretName | default "jaeger-tls" | quote }}
-            # 0440: owned by the pod's fsGroup, which the container runs with.
-            defaultMode: 288
+            # Readable by the owner and group only. The files are group-owned by
+            # the pod's fsGroup, which the container (running as 65534) gets as
+            # a supplemental group.
+            defaultMode: 0440
       {{- end }}
   volumeClaimTemplates:
     - metadata:

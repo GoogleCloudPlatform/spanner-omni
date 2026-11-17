@@ -20,6 +20,8 @@ belong in validations.yaml; these must never block an install or upgrade.
 {{- $monitoring := $.Values.monitoring | default dict }}
 {{- $usesBundledJaeger := and $monitoring.enabled (not $.Values.deployment.traceExporterEndpoint) }}
 {{- $jaegerTls := dig "jaeger" "tls" "enabled" false $monitoring }}
+{{- /* First Spanner Omni release that exports traces over TLS. */}}
+{{- $minTlsTraceRelease := "2026.rN" }}
 {{- if and (not $.Values.global.insecureMode) $usesBundledJaeger (not $jaegerTls) }}
 [WARNING] Traces will NOT be exported in secure mode!
 Spanner Omni is running in secure mode (global.insecureMode=false) and exports
@@ -37,4 +39,15 @@ To fix this:
   3. Upgrade the release with --set monitoring.jaeger.tls.enabled=true.
   4. Restart the Spanner servers: they only start using `ca-otlp.crt` after a
      restart if it was added while they were running.
+{{- end }}
+{{- if and $monitoring.enabled $jaegerTls }}
+
+[NOTE] The bundled Jaeger only accepts traces over TLS (monitoring.jaeger.tls.enabled=true).
+Spanner Omni sends traces to it in plaintext, which Jaeger rejects (so all traces are lost),
+unless all of the following hold, in secure and insecure mode alike:
+  1. The `tls-certs` Secret in the {{ include "spanner-omni.namespace" . | quote }} namespace contains `ca-otlp.crt`, the
+     CA that issued Jaeger's certificate. Use a dedicated CA, not the internal `ca.crt`.
+  2. The Spanner Omni servers run release {{ $minTlsTraceRelease }} or later.
+  3. The Spanner Omni servers were restarted after `ca-otlp.crt` was added, for example:
+       kubectl rollout restart statefulset -n {{ include "spanner-omni.namespace" . }} -l app.kubernetes.io/instance={{ $.Release.Name }}
 {{- end }}

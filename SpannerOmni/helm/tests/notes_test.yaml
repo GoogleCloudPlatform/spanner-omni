@@ -104,3 +104,37 @@ tests:
     asserts:
       - notMatchRegexRaw:
           pattern: "WARNING"
+
+  - it: should list the TLS requirements whenever the bundled Jaeger serves TLS
+    release:
+      name: my-release
+      namespace: spanner-ns
+    set:
+      global:
+        insecureMode: true
+      monitoring:
+        enabled: true
+        jaeger:
+          tls:
+            enabled: true
+    asserts:
+      - matchRegexRaw:
+          pattern: "\\[NOTE\\] The bundled Jaeger only accepts traces over TLS"
+      - matchRegexRaw:
+          pattern: "contains `ca-otlp\\.crt`"
+      - matchRegexRaw:
+          pattern: "release 2026\\.rN or later"
+      - matchRegexRaw:
+          pattern: "kubectl rollout restart statefulset -n spanner-ns -l app\\.kubernetes\\.io/instance=my-release"
+      - notMatchRegexRaw:
+          pattern: "\\[WARNING\\]"
+
+  - it: should not list the TLS requirements when Jaeger doesn't serve TLS
+    set:
+      global:
+        insecureMode: true
+      monitoring:
+        enabled: true
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "\\[NOTE\\]"

@@ -200,6 +200,9 @@
             },
             "secretName": {
               "type": "string"
+            },
+            "reloadInterval": {
+              "type": "string"
             }
           }
         },

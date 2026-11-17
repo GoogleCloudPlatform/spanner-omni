@@ -271,28 +271,34 @@ helm upgrade --install spanner-omni \
 
 ### 3. Exporting Traces to the Bundled Jaeger in Secure Mode
 
-In secure mode (`global.insecureMode=false`), Spanner Omni only exports traces to a remote OTLP collector over TLS, verifying the collector's certificate against `ca-otlp.crt` in the `tls-certs` Secret. Otherwise, traces are dropped. When `monitoring.enabled=true` and `deployment.traceExporterEndpoint` is empty, Spanner exports traces to the bundled Jaeger at `jaeger.<monitoring namespace>.svc.cluster.local`, so Jaeger's OTLP gRPC receiver must serve TLS:
+Starting with Spanner Omni 2026.rN, in secure mode (`global.insecureMode=false`), Spanner Omni only exports traces to a remote OTLP collector over TLS, verifying the collector's certificate against `ca-otlp.crt` in the `tls-certs` Secret. Otherwise, traces are dropped. When `monitoring.enabled=true` and `deployment.traceExporterEndpoint` is empty, Spanner exports traces to the bundled Jaeger at `jaeger.<monitoring namespace>.svc.cluster.local`, so Jaeger's OTLP gRPC receiver must serve TLS.
+
+Use a dedicated CA for the trace collector, not the internal `ca.crt`: Spanner servers accept any client certificate issued by `ca.crt`, so a collector holding one could call internal services.
 
 ```bash
 ns=spanner-ns
 mon_ns=monitoring
+# Create a CA for the trace collector, with its own private key directory.
+spanner certificates create-ca --ca-certificate-directory=otlp-certs --ca-private-key-directory=$HOME/.spanner/otlp-private-keys
 # Issue a certificate for Jaeger. Its SANs must include the Jaeger service DNS name.
-spanner certificates create-server --filename-prefix=jaeger --hostnames=jaeger.$mon_ns.svc.cluster.local --ca-certificate-directory certs --output-directory certs
-kubectl create secret tls jaeger-tls --cert=certs/jaeger.crt --key=certs/jaeger.key -n $mon_ns
+spanner certificates create-server --filename-prefix=jaeger --hostnames=jaeger.$mon_ns.svc.cluster.local \
+  --ca-certificate-directory=otlp-certs --ca-private-key-directory=$HOME/.spanner/otlp-private-keys --output-directory=otlp-certs
+kubectl create secret tls jaeger-tls --cert=otlp-certs/jaeger.crt --key=otlp-certs/jaeger.key -n $mon_ns
 
-# Add the CA that issued Jaeger's certificate to tls-certs as ca-otlp.crt.
-kubectl create secret generic tls-certs \
-  --from-file=ca.crt="certs/ca.crt" \
-  --from-file=ca-api.crt="certs/ca-api.crt" \
-  --from-file=ca-otlp.crt="certs/ca.crt" \
-  --from-file=server.crt="certs/server.crt" \
-  --from-file=server.key="certs/server.key" \
-  --from-file=api.crt="certs/api.crt" \
-  --from-file=api.key="certs/api.key" \
-  -n $ns --dry-run=client -o yaml | kubectl apply -f -
+# Add only ca-otlp.crt to the existing tls-certs Secret, keeping its other keys.
+kubectl patch secret tls-certs -n $ns --type=merge \
+  -p "{\"data\":{\"ca-otlp.crt\":\"$(base64 -w0 otlp-certs/ca.crt)\"}}"
 ```
 
-Then install or upgrade with `--set monitoring.enabled=true --set monitoring.jaeger.tls.enabled=true` (and optionally `--set monitoring.jaeger.tls.secretName=<name>`, default `jaeger-tls`). Spanner servers only start using a newly added `ca-otlp.crt` after a restart. If secure mode uses the bundled Jaeger without TLS, Helm prints a warning after install/upgrade.
+If you create `tls-certs` from scratch instead (as in [step 1](#1-create-the-tls-certs-secret)), add `--from-file=ca-otlp.crt="otlp-certs/ca.crt"` and include every key your deployment uses: recreating the Secret drops any key that isn't listed.
+
+Then install or upgrade with `--set monitoring.enabled=true --set monitoring.jaeger.tls.enabled=true` (and optionally `--set monitoring.jaeger.tls.secretName=<name>`, default `jaeger-tls`). This switches Jaeger to TLS immediately, but Spanner servers only start using a newly added `ca-otlp.crt` after a restart, and adding a key to `tls-certs` doesn't restart them. Until you restart them, traces are lost:
+
+```bash
+kubectl rollout restart statefulset -n $ns -l app.kubernetes.io/instance=<release name>
+```
+
+Enable `monitoring.jaeger.tls.enabled` only with Spanner Omni 2026.rN or later: earlier releases only export traces in plaintext, which a TLS receiver rejects. This also applies in insecure mode. Jaeger re-reads its certificate and key every `monitoring.jaeger.tls.reloadInterval` (default `1h`), so rotating the `jaeger-tls` Secret doesn't require a restart. Helm prints a warning after install/upgrade if secure mode uses the bundled Jaeger without TLS, and a reminder of these requirements whenever Jaeger TLS is enabled.
 
 ## Upgrading Spanner Omni
 
