@@ -29,7 +29,11 @@ tests:
         enabled: true
     asserts:
       - matchRegexRaw:
-          pattern: "\\[WARNING\\] Traces will NOT be exported in secure mode!"
+          pattern: "\\[WARNING\\] Traces may NOT be exported in secure mode!"
+      - matchRegexRaw:
+          pattern: "Starting with Spanner Omni release 2026\\.r6, servers in secure mode only export"
+      - matchRegexRaw:
+          pattern: "Earlier releases still export them in plaintext"
       - matchRegexRaw:
           pattern: "monitoring\\.jaeger\\.tls\\.enabled=true"
       - matchRegexRaw:

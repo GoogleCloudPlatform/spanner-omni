@@ -23,14 +23,16 @@ belong in validations.yaml; these must never block an install or upgrade.
 {{- /* First Spanner Omni release that exports traces over TLS. */}}
 {{- $minTlsTraceRelease := "2026.r6" }}
 {{- if and (not $.Values.global.insecureMode) $usesBundledJaeger (not $jaegerTls) }}
-[WARNING] Traces will NOT be exported in secure mode!
+[WARNING] Traces may NOT be exported in secure mode!
 Spanner Omni is running in secure mode (global.insecureMode=false) and exports
 traces to the bundled Jaeger (monitoring.enabled=true with an empty
 deployment.traceExporterEndpoint), but Jaeger's OTLP gRPC receiver does not
-serve TLS (monitoring.jaeger.tls.enabled=false). In secure mode, Spanner only
-exports traces to a remote OTLP endpoint over TLS, so all traces are dropped.
+serve TLS (monitoring.jaeger.tls.enabled=false).
+Starting with Spanner Omni release {{ $minTlsTraceRelease }}, servers in secure mode only export
+traces to a remote OTLP endpoint over TLS, so with this configuration all traces
+are dropped. Earlier releases still export them in plaintext.
 
-To fix this:
+To export traces over TLS (release {{ $minTlsTraceRelease }} or later):
   1. Create a TLS Secret named {{ dig "jaeger" "tls" "secretName" "jaeger-tls" $monitoring | quote }} (keys tls.crt and tls.key) in
      the {{ $monitoring.namespace | default "monitoring" | quote }} namespace. The certificate's SANs must include
      jaeger.{{ $monitoring.namespace | default "monitoring" }}.svc.cluster.local.
