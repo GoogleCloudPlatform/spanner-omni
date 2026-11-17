@@ -1,0 +1,35 @@
+{{- /*
+Copyright 2026 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/}}
+{{- /*
+Non-fatal warnings shown after `helm install` / `helm upgrade`. Fatal checks
+belong in validations.yaml; these must never block an install or upgrade.
+*/}}
+{{- $monitoring := $.Values.monitoring | default dict }}
+{{- $jaegerTls := eq (include "spanner-omni.jaegerTlsEnabled" .) "true" }}
+{{- /* First Spanner Omni release that exports traces over TLS. */}}
+{{- $minTlsTraceRelease := "2026.r6" }}
+
+{{- if and $monitoring.enabled $jaegerTls }}
+
+[NOTE] The bundled Jaeger only accepts traces over TLS (monitoring.jaeger.tls.enabled, on by default in secure mode).
+Spanner Omni sends traces to it in plaintext, which Jaeger rejects (so all traces are lost),
+unless all of the following hold, in secure and insecure mode alike:
+  1. The `tls-certs` Secret in the {{ include "spanner-omni.namespace" . | quote }} namespace contains `ca-otlp.crt`, the
+     CA that issued Jaeger's certificate. Use a dedicated CA, not the internal `ca.crt`.
+  2. The Spanner Omni servers run release {{ $minTlsTraceRelease }} or later (2026.r4-lts does not support it).
+  3. The Spanner Omni servers were restarted after `ca-otlp.crt` was added, for example:
+       kubectl rollout restart statefulset -n {{ include "spanner-omni.namespace" . }} -l app.kubernetes.io/instance={{ $.Release.Name }}
+{{- end }}

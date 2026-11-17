@@ -353,3 +353,18 @@ Usage: include "spanner-omni.statefulSets" $ | fromYamlArray
   {{- end -}}
   {{- toYaml $stsList -}}
 {{- end -}}
+
+{{/*
+Whether the bundled Jaeger serves OTLP gRPC over TLS: monitoring.jaeger.tls.enabled
+if it is set, otherwise on in secure mode. Must match
+"monitoring.jaegerTlsEnabled" in the monitoring subchart. Renders "true" or
+"false".
+*/}}
+{{- define "spanner-omni.jaegerTlsEnabled" -}}
+{{- $enabled := dig "jaeger" "tls" "enabled" nil (.Values.monitoring | default dict) -}}
+{{- if kindIs "invalid" $enabled -}}
+{{- not .Values.global.insecureMode -}}
+{{- else -}}
+{{- $enabled -}}
+{{- end -}}
+{{- end -}}

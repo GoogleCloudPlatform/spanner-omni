@@ -192,6 +192,23 @@
         "goMemLimit": {
           "type": "string"
         },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "secretName": {
+              "type": "string"
+            },
+            "reloadInterval": {
+              "type": "string"
+            }
+          }
+        },
         "storage": {
           "type": "object",
           "properties": {

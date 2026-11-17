@@ -1,0 +1,110 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Bundled Jaeger OTLP TLS Tests
+templates:
+  - charts/monitoring/templates/jaeger/deployment.yaml
+  - spanner_statefulset.yaml
+  - spanner-config.yaml
+
+tests:
+  - it: should not configure Jaeger TLS by default
+    set:
+      monitoring:
+        enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+          any: true
+        template: charts/monitoring/templates/jaeger/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: jaeger-tls
+          any: true
+        template: charts/monitoring/templates/jaeger/deployment.yaml
+      - isNull:
+          path: spec.template.spec.volumes
+        template: charts/monitoring/templates/jaeger/deployment.yaml
+
+  - it: should serve Jaeger OTLP gRPC over TLS when monitoring.jaeger.tls.enabled is true
+    set:
+      global:
+        insecureMode: false
+      deployment:
+        adminPasswordSecret: spanner-admin-password
+      monitoring:
+        enabled: true
+        jaeger:
+          tls:
+            enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+            value: "true"
+        template: charts/monitoring/templates/jaeger/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_CERT
+            value: /jaeger/tls/tls.crt
+        template: charts/monitoring/templates/jaeger/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_KEY
+            value: /jaeger/tls/tls.key
+        template: charts/monitoring/templates/jaeger/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: jaeger-tls
+            mountPath: /jaeger/tls
+            readOnly: true
+        template: charts/monitoring/templates/jaeger/deployment.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: jaeger-tls
+            secret:
+              secretName: jaeger-tls
+              defaultMode: 288
+              items:
+                - key: tls.crt
+                  path: tls.crt
+                - key: tls.key
+                  path: tls.key
+        template: charts/monitoring/templates/jaeger/deployment.yaml
+      # Spanner keeps exporting to the bundled Jaeger by its service DNS name,
+      # which the Jaeger certificate's SANs must include.
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SPANNER_TRACE_EXPORTER_ENDPOINT
+            value: dns:///jaeger.monitoring.svc.cluster.local:4317
+        template: spanner_statefulset.yaml
+      # The whole tls-certs Secret (including ca-otlp.crt) is mounted.
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tls-certs
+            secret:
+              secretName: tls-certs
+              optional: true
+              defaultMode: 256
+        template: spanner_statefulset.yaml

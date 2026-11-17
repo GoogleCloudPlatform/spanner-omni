@@ -1,0 +1,156 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Jaeger OTLP TLS Tests
+templates:
+  - templates/jaeger/deployment.yaml
+
+tests:
+  - it: should not configure TLS by default in insecure mode
+    set:
+      global:
+        insecureMode: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_CERT
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_KEY
+          any: true
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts
+          value:
+            - name: jaeger-pvc
+              mountPath: /badger
+      - isNull:
+          path: spec.template.spec.volumes
+
+  - it: should serve OTLP gRPC over TLS from the default secret when enabled
+    set:
+      global:
+        insecureMode: false
+      jaeger:
+        tls:
+          enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_CERT
+            value: /jaeger/tls/tls.crt
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_KEY
+            value: /jaeger/tls/tls.key
+      # Rotated certificates are picked up without a restart.
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_RELOAD_INTERVAL
+            value: 1h
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: jaeger-tls
+            mountPath: /jaeger/tls
+            readOnly: true
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: jaeger-pvc
+            mountPath: /badger
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: jaeger-tls
+              secret:
+                secretName: jaeger-tls
+                defaultMode: 288
+                items:
+                  - key: tls.crt
+                    path: tls.crt
+                  - key: tls.key
+                    path: tls.key
+      # OTLP HTTP and UI ports are unchanged.
+      - equal:
+          path: spec.template.spec.containers[0].ports
+          value:
+            - containerPort: 4317
+            - containerPort: 4318
+            - containerPort: 16686
+
+  - it: should use a custom TLS secret name and reload interval
+    set:
+      # The chart's schema requires `global`.
+      global:
+        insecureMode: false
+      jaeger:
+        tls:
+          enabled: true
+          secretName: my-jaeger-cert
+          reloadInterval: 10m
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: my-jaeger-cert
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_RELOAD_INTERVAL
+            value: 10m
+
+  - it: should serve TLS by default in secure mode
+    set:
+      global:
+        insecureMode: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+            value: "true"
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: jaeger-tls
+
+  - it: should not serve TLS when explicitly disabled
+    set:
+      global:
+        insecureMode: false
+      jaeger:
+        tls:
+          enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+          any: true
+      - isNull:
+          path: spec.template.spec.volumes

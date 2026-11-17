@@ -13,6 +13,7 @@
 # limitations under the License.
 
 {{- $platformValues := include "monitoring.PlatformValues" . | fromYaml }}
+{{- $jaegerTls := eq (include "monitoring.jaegerTlsEnabled" .) "true" }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -68,6 +69,20 @@ spec:
             - name: GOMEMLIMIT
               value: {{ . | quote }}
             {{- end }}
+            {{- if $jaegerTls }}
+            # Serve the OTLP gRPC receiver over TLS. In secure mode, Spanner
+            # only exports traces to a remote OTLP endpoint over TLS.
+            - name: COLLECTOR_OTLP_GRPC_TLS_ENABLED
+              value: "true"
+            - name: COLLECTOR_OTLP_GRPC_TLS_CERT
+              value: "/jaeger/tls/tls.crt"
+            - name: COLLECTOR_OTLP_GRPC_TLS_KEY
+              value: "/jaeger/tls/tls.key"
+            # Re-read the certificate and key periodically, so that a rotated
+            # Secret is picked up without restarting Jaeger.
+            - name: COLLECTOR_OTLP_GRPC_TLS_RELOAD_INTERVAL
+              value: {{ $.Values.jaeger.tls.reloadInterval | default "1h" | quote }}
+            {{- end }}
           ports:
             - containerPort: {{ $.Values.jaeger.ports.otlpGrpc }} # gRPC collection
             - containerPort: {{ $.Values.jaeger.ports.otlpHttp }} # HTTP collection
@@ -94,6 +109,28 @@ spec:
           volumeMounts:
             - name: jaeger-pvc
               mountPath: /badger
+            {{- if $jaegerTls }}
+            - name: jaeger-tls
+              mountPath: /jaeger/tls
+              readOnly: true
+            {{- end }}
+      {{- if $jaegerTls }}
+      volumes:
+        - name: jaeger-tls
+          secret:
+            secretName: {{ $.Values.jaeger.tls.secretName | default "jaeger-tls" | quote }}
+            # Readable by the owner and group only. The files are group-owned by
+            # the pod's fsGroup, which the container (running as 65534) gets as
+            # a supplemental group.
+            defaultMode: 0440
+            # List the keys explicitly, so that a Secret without them fails to
+            # mount with a clear event instead of Jaeger failing to start.
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: jaeger-pvc

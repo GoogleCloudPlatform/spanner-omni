@@ -1,0 +1,72 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+suite: Jaeger OTLP TLS Warning Tests
+templates:
+  - NOTES.txt
+
+tests:
+  - it: should list the TLS requirements in secure mode, where Jaeger TLS is on by default
+    release:
+      name: my-release
+      namespace: spanner-ns
+    set:
+      global:
+        insecureMode: false
+      deployment:
+        adminPasswordSecret: spanner-admin-password
+      monitoring:
+        enabled: true
+    asserts:
+      - matchRegexRaw:
+          pattern: "\\[NOTE\\] The bundled Jaeger only accepts traces over TLS"
+      - matchRegexRaw:
+          pattern: "contains `ca-otlp\\.crt`"
+      - matchRegexRaw:
+          pattern: "release 2026\\.r6 or later"
+      - matchRegexRaw:
+          pattern: "kubectl rollout restart statefulset -n spanner-ns -l app\\.kubernetes\\.io/instance=my-release"
+
+  - it: should list the TLS requirements when Jaeger TLS is enabled in insecure mode
+    set:
+      global:
+        insecureMode: true
+      monitoring:
+        enabled: true
+        jaeger:
+          tls:
+            enabled: true
+    asserts:
+      - matchRegexRaw:
+          pattern: "\\[NOTE\\] The bundled Jaeger only accepts traces over TLS"
+
+  - it: should not list the TLS requirements in insecure mode by default
+    set:
+      global:
+        insecureMode: true
+      monitoring:
+        enabled: true
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "\\[NOTE\\]"
+
+  - it: should not list the TLS requirements when monitoring is disabled
+    set:
+      global:
+        insecureMode: false
+      deployment:
+        adminPasswordSecret: spanner-admin-password
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "\\[NOTE\\]"

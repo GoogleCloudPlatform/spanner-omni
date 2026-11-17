@@ -30,3 +30,17 @@ Resolve effective values for monitoring subchart by merging subchart values and 
 {{- $result = merge $result $base -}}
 {{- toYaml $result -}}
 {{- end -}}
+
+{{/*
+Whether the bundled Jaeger serves OTLP gRPC over TLS: jaeger.tls.enabled if it
+is set, otherwise on in secure mode (global.insecureMode=false). Renders "true"
+or "false".
+*/}}
+{{- define "monitoring.jaegerTlsEnabled" -}}
+{{- $enabled := (.Values.jaeger.tls | default dict).enabled -}}
+{{- if kindIs "invalid" $enabled -}}
+{{- eq (.Values.global | default dict).insecureMode false -}}
+{{- else -}}
+{{- $enabled -}}
+{{- end -}}
+{{- end -}}
