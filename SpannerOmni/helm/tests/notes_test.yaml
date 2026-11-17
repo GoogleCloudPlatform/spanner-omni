@@ -123,7 +123,7 @@ tests:
       - matchRegexRaw:
           pattern: "contains `ca-otlp\\.crt`"
       - matchRegexRaw:
-          pattern: "release 2026\\.r4-lts\\.3 or later"
+          pattern: "release 2026\\.r6 or later"
       - matchRegexRaw:
           pattern: "kubectl rollout restart statefulset -n spanner-ns -l app\\.kubernetes\\.io/instance=my-release"
       - notMatchRegexRaw:

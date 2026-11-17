@@ -88,8 +88,8 @@ jaeger:
   # certificate against `ca-otlp.crt` in the Spanner `tls-certs` Secret. Without
   # TLS here, traces from secure-mode deployments are dropped. When enabled,
   # `ca-otlp.crt` is required in every mode (without it, Spanner exports in
-  # plaintext, which a TLS receiver rejects). Requires Spanner Omni 2026.r4-lts.3 or
-  # later (not 2026.r5); earlier releases only export in plaintext. Spanner servers pick up a
+  # plaintext, which a TLS receiver rejects). Requires Spanner Omni 2026.r6 or later
+  # (not 2026.r4-lts); earlier releases only export in plaintext. Spanner servers pick up a
   # newly added `ca-otlp.crt` only after a restart.
   tls:
     # Serve the OTLP gRPC receiver over TLS. Defaults to false.
