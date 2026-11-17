@@ -121,3 +121,25 @@ If any assertion fails, Helm will immediately abort the installation/upgrade.
 {{- if and $.Values.deployment.singleServer (and $.Values.workers $.Values.workers.enabled) }}
   {{- fail "\n\n[FATAL] Worker nodes ('workers.enabled=true') are not supported in single-server deployments (deployment.singleServer=true)!\n" }}
 {{- end }}
+
+{{- /*
+Validate the bundled Jaeger's TLS Secret when Jaeger TLS is enabled. lookup only
+returns objects against a live cluster (not for `helm template` or
+`--dry-run=client`), so only check when the monitoring namespace is found.
+*/}}
+{{- $monitoring := $.Values.monitoring | default dict }}
+{{- if and $monitoring.enabled (dig "jaeger" "tls" "enabled" false $monitoring) }}
+  {{- $monNs := $monitoring.namespace | default "monitoring" }}
+  {{- $jaegerTlsSecret := dig "jaeger" "tls" "secretName" "jaeger-tls" $monitoring }}
+  {{- if lookup "v1" "Namespace" "" $monNs }}
+    {{- $secret := lookup "v1" "Secret" $monNs $jaegerTlsSecret }}
+    {{- if not $secret }}
+      {{- fail (printf "\n\n[FATAL] monitoring.jaeger.tls.enabled=true, but the Secret '%s' doesn't exist in the '%s' namespace! Create it with keys tls.crt and tls.key (e.g. `kubectl create secret tls %s --cert=... --key=... -n %s`), or set monitoring.jaeger.tls.secretName.\n" $jaegerTlsSecret $monNs $jaegerTlsSecret $monNs) }}
+    {{- end }}
+    {{- range $key := list "tls.crt" "tls.key" }}
+      {{- if empty (get ($secret.data | default dict) $key) }}
+        {{- fail (printf "\n\n[FATAL] monitoring.jaeger.tls.enabled=true, but the Secret '%s' in the '%s' namespace has no (or an empty) '%s' key! Jaeger's OTLP gRPC receiver needs both tls.crt and tls.key.\n" $jaegerTlsSecret $monNs $key) }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

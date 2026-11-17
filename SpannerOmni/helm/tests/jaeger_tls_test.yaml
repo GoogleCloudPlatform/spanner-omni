@@ -84,6 +84,11 @@ tests:
             secret:
               secretName: jaeger-tls
               defaultMode: 288
+              items:
+                - key: tls.crt
+                  path: tls.crt
+                - key: tls.key
+                  path: tls.key
         template: charts/monitoring/templates/jaeger/deployment.yaml
       # Spanner keeps exporting to the bundled Jaeger by its service DNS name,
       # which the Jaeger certificate's SANs must include.

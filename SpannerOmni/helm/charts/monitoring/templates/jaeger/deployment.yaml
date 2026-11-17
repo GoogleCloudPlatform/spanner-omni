@@ -122,6 +122,13 @@ spec:
             # the pod's fsGroup, which the container (running as 65534) gets as
             # a supplemental group.
             defaultMode: 0440
+            # List the keys explicitly, so that a Secret without them fails to
+            # mount with a clear event instead of Jaeger failing to start.
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
       {{- end }}
   volumeClaimTemplates:
     - metadata:
