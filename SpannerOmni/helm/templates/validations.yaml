@@ -126,13 +126,13 @@ If any assertion fails, Helm will immediately abort the installation/upgrade.
 {{- $jaegerTlsEnabled := eq (include "spanner-omni.jaegerTlsEnabled" .) "true" }}
 
 {{- /*
-In secure mode, Spanner Omni (2026.r6 and later) only exports traces to a remote
-collector over TLS, so the bundled Jaeger (used when
+In secure mode, Spanner Omni (2026.r4-lts.3 or later) only exports traces to a
+remote collector over TLS, so the bundled Jaeger (used when
 deployment.traceExporterEndpoint is empty) must serve TLS. Jaeger TLS defaults
 to on in secure mode; fail if it was turned off.
 */}}
 {{- if and (not $.Values.global.insecureMode) $monitoring.enabled (not $.Values.deployment.traceExporterEndpoint) (not $jaegerTlsEnabled) }}
-  {{- fail "\n\n[FATAL] Secure mode (global.insecureMode=false) with the bundled Jaeger (monitoring.enabled=true and an empty deployment.traceExporterEndpoint) requires TLS on Jaeger's OTLP gRPC receiver, because Spanner Omni only exports traces to a remote collector over TLS! Remove monitoring.jaeger.tls.enabled=false (it defaults to true in secure mode), or set deployment.traceExporterEndpoint to your own collector. For Spanner Omni releases before 2026.r6, use chart 1.x.\n" }}
+  {{- fail "\n\n[FATAL] Secure mode (global.insecureMode=false) with the bundled Jaeger (monitoring.enabled=true and an empty deployment.traceExporterEndpoint) requires TLS on Jaeger's OTLP gRPC receiver, because Spanner Omni only exports traces to a remote collector over TLS! Remove monitoring.jaeger.tls.enabled=false (it defaults to true in secure mode), or set deployment.traceExporterEndpoint to your own collector. TLS trace export needs Spanner Omni 2026.r4-lts.3 or later; with earlier releases, use chart 1.x.\n" }}
 {{- end }}
 
 {{- /*

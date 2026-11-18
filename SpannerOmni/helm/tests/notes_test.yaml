@@ -34,9 +34,14 @@ tests:
       - matchRegexRaw:
           pattern: "contains `ca-otlp\\.crt`"
       - matchRegexRaw:
-          pattern: "release 2026\\.r6 or later"
+          pattern: "servers run 2026\\.r4-lts\\.3 or later\\."
       - matchRegexRaw:
           pattern: "kubectl rollout restart statefulset -n spanner-ns -l app\\.kubernetes\\.io/instance=my-release"
+      # A neutral checklist: it must not claim traces are being rejected.
+      - matchRegexRaw:
+          pattern: "make sure that:"
+      - notMatchRegexRaw:
+          pattern: "plaintext|unless all of the following"
 
   - it: should list the TLS requirements when Jaeger TLS is enabled in insecure mode
     set:
