@@ -17,4 +17,4 @@ name: monitoring
 description: A Helm chart for Spanner Omni monitoring stack
 type: application
 version: 2.0.0
-appVersion: "2026.r6"
+appVersion: "2026.r5.2"

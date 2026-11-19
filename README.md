@@ -325,7 +325,7 @@ For multi-server deployments (`deployment.singleServer=false`), `helm upgrade` a
 ```bash
 helm upgrade spanner-omni \
   oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.2.0 \
-  -n spanner-ns --reuse-values --set image.tag=2026.r6 --timeout 30m
+  -n spanner-ns --reuse-values --set image.tag=2026.r5.2 --timeout 30m
 ```
 
 Monitor the staggered rollout job progress:
@@ -341,7 +341,7 @@ In single-server mode (`deployment.singleServer=true`), Spanner binds internal s
 1. **Run Prepare Phase via Ephemeral Debug Container**:
    ```bash
    kubectl debug pod/spanner-a-0 -n spanner-ns \
-     --image=us-docker.pkg.dev/spanner-omni/images/spanner-omni-server:2026.r6 \
+     --image=us-docker.pkg.dev/spanner-omni/images/spanner-omni-server:2026.r5.2 \
      --container=upgrade-prepare -i \
      -- /google/spanner/bin/spanner_server prepare_for_upgrade --root_server=127.0.0.1
    ```
@@ -349,7 +349,7 @@ In single-server mode (`deployment.singleServer=true`), Spanner binds internal s
    ```bash
    helm upgrade spanner-omni \
      oci://us-docker.pkg.dev/spanner-omni/charts/spanner-omni --version 1.2.0 \
-     -n spanner-ns --reuse-values --set image.tag=2026.r6 --timeout 30m
+     -n spanner-ns --reuse-values --set image.tag=2026.r5.2 --timeout 30m
    ```
 
 ### Tracking Rollout Status & Progressing Phases
